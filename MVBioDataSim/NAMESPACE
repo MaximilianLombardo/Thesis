@@ -1,0 +1,4 @@
+exportPattern("*")
+import(Matrix)
+import(deSolve)
+import(igraph)
