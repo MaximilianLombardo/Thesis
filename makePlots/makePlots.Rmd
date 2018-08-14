@@ -1,0 +1,72 @@
+---
+title: "makePlots"
+author: "Maximilian Lombardo"
+date: "August 14, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Making figures using simulated data
+#Make sure to have local version of SNFTool installed
+file.path <- "~/Documents/uva/master/Thesis/utils/simMVData.R" 
+source(file.path)
+
+```
+
+```{r}
+#Load Simulated Data from Similarity Network Fusion
+library(SNFtool)
+
+
+#Data and Labels for simulated scenario A -- from SNFtool pacakge
+data("Data1")#Loads Data1
+data("Data2")#Loads Data2
+
+truelabel.1 <- c(matrix(1,100,1),matrix(2,100,1))
+
+#Data and Labels for simulated scenario B
+
+noise.simulation <- SimulateNoisyData(gaussian.noise = 1, gamma.noise = 2)
+
+#Data and labels for simulated Scenario C
+misclassification.simulation <- simulateMisclassificationData()
+```
+
+
+```{r}
+#Load SNF simulated data
+
+#Figure 1 Individual Simulated Data Scatter Views
+
+#Scenario A - Inverted Labels
+plotSimDataScatter(Data1, truelabel.1, "Simulated Data View 1")
+plotSimDataScatter(Data2, truelabel.1, "Simulated Data View 2")
+
+#Scenario B Gaussian and Gamma Noise added to ground truth
+
+plotSimDataScatter(dat = noise.simulation$ground.truth[,c("V1", "V2")],
+                   lab = noise.simulation$ground.truth[,c("label")],
+                   main.title =  "Noisy Simulated Data Ground Truth")
+
+plotSimDataScatter(dat = noise.simulation$gaussian.noise[,c("V1", "V2")],
+                   lab = noise.simulation$gaussian.noise[,c("label")],
+                   main.title =  "Noisy Simulated Data Gaussian Noise")
+
+plotSimDataScatter(dat = noise.simulation$gamma.noise[,c("V1", "V2")],
+                   lab = noise.simulation$gamma.noise[,c("label")],
+                   main.title =  "Noisy Simulated Data Gamma Noise")
+
+#Scenario C Misclassification on the Boundaries of Groups
+
+
+```
+
+```{r}
+#Figure 2 Similarity Network Fusion Heat Comparison
+plotSNFHeatComparison(Data1, Data2, truelabel = truelabel.1)
+
+```
