@@ -1,4 +1,4 @@
-simulateMultiviewData(gaussian.noise = 0.5, gamma.noise = 2){
+simulateMultiviewData <- function(gaussian.noise = 0.5, gamma.noise = 2){
   require(mlbench)
   require(ggplot2)
   
@@ -48,7 +48,7 @@ addGammaNoise <- function(pure.data, noise.level = 1){
   return(noisy.data)
   
 }
-
+'''
 spiral = mlbench.spirals(1000,sd=0.1)
 spiral = data.frame(x=spiral$x[,1],y=spiral$x[,2],class=factor(spiral$classes))
 
@@ -78,6 +78,10 @@ concatViews.scale <- scale(concatViews, center = TRUE, scale = TRUE)
 concat.pca <- prcomp(x = t(concatViews.scale))
 concat.pca <- data.frame(x = concat.pca$rotation[,1], y = concat.pca$rotation[,3], class = normals$class)
 ggplot(concat.pca,aes(x,y,color=class)) + geom_point()
+'''
+
+'''
+
 
 #Do the same on the TSNE plot?
 ##############################################################################################3
@@ -98,12 +102,6 @@ T = 10; 	# Number of Iterations, usually (10~20)
 ## Data2 is of size n x d_2, where n is the number of patients, d_2 is the number of methylation, e.g.
 data(Data1)
 data(Data2)
-
-
-plotSNFHeatComparison <- function(Data1, Data2, truelabel = c(matrix(1,100,1),matrix(2,100,1)),
-                                  K = 20, alpha = 0.5, T = 10){
-  
-}
 
 ## Here, the simulation data (Data1, Data2) has two data types. They are complementary to each other. And two data types have the same number of points. The first half data belongs to the first cluster; the rest belongs to the second cluster.
 
@@ -147,9 +145,9 @@ group.2 = spectralClustering(W2, C); 	# the final subtypes information
 ###Similarity network fusion result....
 plot.new()
 par(mfrow = c(1,3), oma = c(10,0,10,0))
-displayClusters(W1, group.1, main.title = 'Data View 1')
-displayClusters(W2, group.2, main.title = 'Data View 2')
-displayClusters(W, group, main.title = 'Fused Data Views')
+displayClusters(W1, group.1, main.title = "Data View 1")
+displayClusters(W2, group.2, main.title = "Data View 2")
+displayClusters(W, group, main.title = "Fused Data Views")
 title(main = list("Title", cex = 4), outer=TRUE)
 
 "Clustering results of individual and fused data views"
@@ -157,10 +155,13 @@ title(main = list("Title", cex = 4), outer=TRUE)
 SNFNMI = calNMI(group, truelabel)
 SNFNMI.1 = calNMI(group.1, truelabel)
 SNFNMI.2 = calNMI(group.2, truelabel)
+'''
 
-
-plotSNFHeatComparison <- function(Data1, Data2, truelabel = c(matrix(1,100,1),matrix(2,100,1)),
+plotSNFHeatComparison <- function(Data1, Data2,
+				  truelabel = c(matrix(1,100,1),matrix(2,100,1)),
                                   K = 20, alpha = 0.5, T = 10){
+  
+  require(SNFtool)
   
   ## Here, the simulation data (Data1, Data2) has two data types. They are complementary to each other. And two data types have the same number of points. The first half data belongs to the first cluster; the rest belongs to the second cluster.
   truelabel = c(matrix(1,100,1),matrix(2,100,1)) ##the ground truth of the simulated data;
@@ -199,7 +200,7 @@ plotSNFHeatComparison <- function(Data1, Data2, truelabel = c(matrix(1,100,1),ma
   displayClusters(W1, group.1, main.title = 'Data View 1')
   displayClusters(W2, group.2, main.title = 'Data View 2')
   displayClusters(W, group, main.title = 'Fused Data Views')
-  title(main = list("Title", cex = 4), outer=TRUE)
+  title(main = list("Effect of Data fusion on Simulated Data", cex = 4), outer=TRUE)
   
   #"Clustering results of individual and fused data views"
   
