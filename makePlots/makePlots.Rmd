@@ -12,7 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #Making figures using simulated data
 #Make sure to have local version of SNFTool installed
-file.path <- "~/Documents/uva/master/Thesis/utils/simMVData.R" 
+#file.path <- "~/Documents/uva/master/Thesis/utils/simMVData.R" 
+file.path <- "~/Documents/gitRepos//master/utils/simMVData.R"
 source(file.path)
 
 ```
@@ -26,14 +27,16 @@ library(SNFtool)
 data("Data1")#Loads Data1
 data("Data2")#Loads Data2
 
-truelabel.1 <- c(matrix(1,100,1),matrix(2,100,1))
+labels <- c(matrix(1,100,1),matrix(2,100,1))
+
+inverted.sim <- processSNFData(Data1, Data2, labels)
+
 
 #Data and Labels for simulated scenario B
-
-noise.simulation <- SimulateNoisyData(gaussian.noise = 1, gamma.noise = 2)
+noise.sim <- simulateNoisyData(gaussian.noise = 1, gamma.noise = 2)
 
 #Data and labels for simulated Scenario C
-misclassification.simulation <- simulateMisclassificationData()
+misclass.sim <- simulateMisclassificationData(num = 1000, rad = 2.2)
 ```
 
 
@@ -42,31 +45,54 @@ misclassification.simulation <- simulateMisclassificationData()
 
 #Figure 1 Individual Simulated Data Scatter Views
 
-#Scenario A - Inverted Labels
-plotSimDataScatter(Data1, truelabel.1, "Simulated Data View 1")
-plotSimDataScatter(Data2, truelabel.1, "Simulated Data View 2")
+#Scenario A - Inverted Labels - variable class definition
+plotSimDataScatter(dat = inverted.sim$classes[,c("V1", "V2")],
+                   lab = inverted.sim$classes[,c("label")],
+                   main.title =  "View 1 Classfication")
+plotSimDataScatter(dat = inverted.sim$inverted.classes[,c("V1", "V2")],
+                   lab = inverted.sim$inverted.classes[,c("label")],
+                   main.title =  "View 2 Inverted Classification")
+
+
 
 #Scenario B Gaussian and Gamma Noise added to ground truth
-
-plotSimDataScatter(dat = noise.simulation$ground.truth[,c("V1", "V2")],
-                   lab = noise.simulation$ground.truth[,c("label")],
+plotSimDataScatter(dat = noise.sim$ground.truth[,c("V1", "V2")],
+                   lab = noise.sim$ground.truth[,c("label")],
                    main.title =  "Noisy Simulated Data Ground Truth")
-
-plotSimDataScatter(dat = noise.simulation$gaussian.noise[,c("V1", "V2")],
-                   lab = noise.simulation$gaussian.noise[,c("label")],
+plotSimDataScatter(dat = noise.sim$gaussian.noise[,c("V1", "V2")],
+                   lab = noise.sim$gaussian.noise[,c("label")],
                    main.title =  "Noisy Simulated Data Gaussian Noise")
-
-plotSimDataScatter(dat = noise.simulation$gamma.noise[,c("V1", "V2")],
-                   lab = noise.simulation$gamma.noise[,c("label")],
+plotSimDataScatter(dat = noise.sim$gamma.noise[,c("V1", "V2")],
+                   lab = noise.sim$gamma.noise[,c("label")],
                    main.title =  "Noisy Simulated Data Gamma Noise")
 
-#Scenario C Misclassification on the Boundaries of Groups
-
+# Scenario C Misclassification on the Boundaries of Groups
+plotSimDataScatter(dat = misclass.sim$ground.truth[,c("V1", "V2")],
+                   lab = misclass.sim$ground.truth[,c("label")],
+                   main.title =  "Misclassification Simulation Ground Truth")
+plotSimDataScatter(dat = misclass.sim$misclassification.1[,c("V1", "V2")],
+                   lab = misclass.sim$misclassification.1[,c("label")],
+                   main.title =  "Misclassification Simulation Scenario 1")
+plotSimDataScatter(dat = misclass.sim$misclassification.2[,c("V1", "V2")],
+                   lab = misclass.sim$misclassification.2[,c("label")],
+                   main.title =  "Misclassification Simulation Scenario 2")
 
 ```
 
 ```{r}
 #Figure 2 Similarity Network Fusion Heat Comparison
-plotSNFHeatComparison(Data1, Data2, truelabel = truelabel.1)
+#Scenario A - inverted labels
+a.nmi <- plotSNFHeatComparison(Data1 = inverted.sim$classes,
+                               Data2 = inverted.sim$inverted.classes,
+                               truelabel = inverted.sim$true.label)
+
+#Scenario B - Noisy views
+b.nmi <- plotSNFHeatComparison(Data1 = noise.sim$gaussian.noise,
+                               Data2 = noise.sim$gamma.noise,
+                               truelabel = noise.sim$true.label)
+#Scenario C - misclassification
+c.nmi <- plotSNFHeatComparison(Data1 = misclass.sim$misclassification.1,
+                               Data2 = misclass.sim$misclassification.2,
+                               truelabel = misclass.sim$true.label)
 
 ```

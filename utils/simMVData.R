@@ -1,4 +1,21 @@
-SimulateNoisyData <- function(num = 1000, gaussian.noise = 0.5, gamma.noise = 2){
+processSNFData <- function(dat1, dat2, label){
+  
+  data.modalities <- list()
+  
+  colnames(dat1) <- c("V1", "V2")
+  colnames(dat2) <- c("V1", "V2")
+  
+  dat1 <- data.frame(dat1, label = label)
+  dat2 <- data.frame(dat2, label = label)
+  
+  data.modalities$classes <- dat1
+  data.modalities$inverted.classes <- dat2
+  data.modalities$true.label <- label
+  
+  return(data.modalities)
+}
+
+simulateNoisyData <- function(num = 1000, gaussian.noise = 0.5, gamma.noise = 2){
   require(mlbench)
 
   data.modalities <- list()
@@ -13,7 +30,8 @@ SimulateNoisyData <- function(num = 1000, gaussian.noise = 0.5, gamma.noise = 2)
   data.modalities$ground.truth <- normals
   data.modalities$gaussian.noise <- noisy.normals.gaussian
   data.modalities$gamma.noise <- noisy.normals.gamma
-  
+  data.modalities$true.label <- normals$label
+    
   return(data.modalities)
 }
 
@@ -52,7 +70,7 @@ addGammaNoise <- function(pure.data, noise.level = 1){
 simulateMisclassificationData <- function(num = 1000, rad = 2.2){
   
   require(plyr)
-  
+  require(mlbench)
   data.modalities <- list()
   
   #Slightly overlapping data
@@ -64,20 +82,22 @@ simulateMisclassificationData <- function(num = 1000, rad = 2.2){
   switch.labels <- normals[inBoundary,]
   keep.labels <- normals[!inBoundary,]
   
+  #Keep track of real label
   real.label <- switch.labels$label
   
+  #Biased misclassification of labels, always one class or the other...
   switch.labels.1 <- plyr::mapvalues(real.label, from = c(1), to = c(2))
   switch.labels.2 <- plyr::mapvalues(real.label, from = c(2), to = c(1))
   
-  levels(switch.labels.1) <- c(1,2)
-  levels(switch.labels.2) <- c(1,2)
-  
-  switch.labels.1 <- cbind(switch.labels[,c(1:2)], switch.labels.1)
-  switch.labels.2 <- cbind(switch.labels[,c(1:2)], switch.labels.2)
+  switch.labels.1 <- cbind(switch.labels[,c(1:2)], label = switch.labels.1)
+  switch.labels.2 <- cbind(switch.labels[,c(1:2)], label = switch.labels.2)
   
   data.modalities$ground.truth <- normals
-  
   data.modalities$misclassification.1 <- rbind(keep.labels, switch.labels.1)
+  data.modalities$misclassification.2 <- rbind(keep.labels, switch.labels.2)
+  data.modalities$true.label <- unlist(list(keep.labels$label, real.label))
+  
+  return(data.modalities)
 }
 
 checkBoundary <- function(point, radius){
@@ -94,11 +114,13 @@ checkBoundary <- function(point, radius){
 switchLabels <- function(point, switch){
 }
 
-plotSNFHeatComparison <- function(Data1, Data2,
-				  truelabel = c(matrix(1,100,1),matrix(2,100,1)),
+plotSNFHeatComparison <- function(Data1, Data2, truelabel,
                                   K = 20, alpha = 0.5, t = 10){
-  
   require(SNFtool)
+  
+  #Process the data set
+  Data1 <- as.matrix(Data1[,c("V1", "V2")])
+  Data2 <- as.matrix(Data2[,c("V1", "V2")])
   
   ## Here, the simulation data (Data1, Data2) has two data types. They are complementary to each other. And two data types have the same number of points. The first half data belongs to the first cluster; the rest belongs to the second cluster.
    ##the ground truth of the simulated data;
