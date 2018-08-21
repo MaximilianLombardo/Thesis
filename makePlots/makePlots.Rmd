@@ -33,7 +33,7 @@ inverted.sim <- processSNFData(Data1, Data2, labels)
 
 
 #Data and Labels for simulated scenario B
-noise.sim <- simulateNoisyData(gaussian.noise = 1, gamma.noise = 2)
+noise.sim <- simulateNoisyData(gaussian.noise = 3, gamma.noise = 2)
 
 #Data and labels for simulated Scenario C
 misclass.sim <- simulateMisclassificationData(num = 1000, rad = 2.2)
@@ -41,7 +41,6 @@ misclass.sim <- simulateMisclassificationData(num = 1000, rad = 2.2)
 
 
 ```{r}
-#Load SNF simulated data
 
 #Figure 1 Individual Simulated Data Scatter Views
 
@@ -89,10 +88,21 @@ a.nmi <- plotSNFHeatComparison(Data1 = inverted.sim$classes,
 #Scenario B - Noisy views
 b.nmi <- plotSNFHeatComparison(Data1 = noise.sim$gaussian.noise,
                                Data2 = noise.sim$gamma.noise,
-                               truelabel = noise.sim$true.label)
+                               truelabel = noise.sim$true.label,
+                               alpha = 10, down.pct = 0.2)
 #Scenario C - misclassification
 c.nmi <- plotSNFHeatComparison(Data1 = misclass.sim$misclassification.1,
                                Data2 = misclass.sim$misclassification.2,
                                truelabel = misclass.sim$true.label)
 
+```
+
+```{r}
+#Figure 3 - K means multiple kernel learning as implemented by Mehmet Gonen
+source.path <- "~/Documents/gitRepos/master/lmkkmeans-master"
+
+
+e.nmi <- plotMKLKMHeatComparison(Data1 = inverted.sim$classes,
+                               Data2 = inverted.sim$inverted.classes,
+                               truelabel = inverted.sim$true.label)
 ```
