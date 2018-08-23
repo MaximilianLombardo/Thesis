@@ -12,8 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #Making figures using simulated data
 #Make sure to have local version of SNFTool installed
-#file.path <- "~/Documents/uva/master/Thesis/utils/simMVData.R" 
-file.path <- "~/Documents/gitRepos//master/utils/simMVData.R"
+file.path <- "~/Documents/uva/master/the/utils/simMVData.R" 
+#file.path <- "~/Documents/gitRepos//master/utils/simMVData.R"
 source(file.path)
 
 ```
