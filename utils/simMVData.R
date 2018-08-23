@@ -114,24 +114,21 @@ checkBoundary <- function(point, radius){
 switchLabels <- function(point, switch){
 }
 
-plotSNFHeatComparison <- function(Data1, Data2, truelabel,
-                                  K = 20, alpha = 0.5, iter = 10,
-                                  down.pct = 1){
-  require(SNFtool)
-  require(RColorBrewer)
+
+runKMMKLPipeline <- function(data.list, truelabel,
+                           K = 20, alpha = 0.5, iter = 10,
+                           down.pct = 1, C = 2){
+  source("~/Documents/gitRepos/master/lmkkmeans-master/lmkkmeans_train.R")
   #Process the data set
+  
   Data1 <- as.matrix(Data1[,c("V1", "V2")])
   Data2 <- as.matrix(Data2[,c("V1", "V2")])
   
-  ## Here, the simulation data (Data1, Data2) has two data types. They are complementary to each other. And two data types have the same number of points. The first half data belongs to the first cluster; the rest belongs to the second cluster.
-   ##the ground truth of the simulated data;
-  
-  ## Calculate distance matrices(here we calculate Euclidean Distance, you can use other distance, e.g,correlation)
-  ## If the data are all continuous values, we recommend the users to perform standard normalization before using SNF, though it is optional depending on the data the users want to use.  
+  #Normalization
   Data1 = standardNormalization(Data1)
   Data2 = standardNormalization(Data2)
   
-  ## Calculate the pair-wise distance; If the data is continuous, we recommend to use the function "dist2" as follows; if the data is discrete, we recommend the users to use ""
+  #Calculate distance
   Dist1 = dist2(as.matrix(Data1),as.matrix(Data1));
   Dist2 = dist2(as.matrix(Data2),as.matrix(Data2));
   
@@ -139,44 +136,102 @@ plotSNFHeatComparison <- function(Data1, Data2, truelabel,
   W1 = affinityMatrix(Dist1, K, alpha)
   W2 = affinityMatrix(Dist2, K, alpha)
   
+  #Run SNF
+  W = SNF(Wall = list(W1,W2), K = K, t = iter)
+  
+  
+  #Cluster
+  group = spectralClustering(W, C);
+  group.1 = spectralClustering(W1, C);
+  group.2 = spectralClustering(W2, C);
+  
+  #"Clustering results of individual and fused data views"
+  SNFNMI = calNMI(group, truelabel)
+  SNFNMI.1 = calNMI(group.1, truelabel)
+  SNFNMI.2 = calNMI(group.2, truelabel)
+  
+  return(list(affinity.matrices = list(W1 = W1, W2 = W2, W = W),
+              nmi.values = list(nmi.1 = SNFNMI.1, nmi.2 = SNFNMI.2, nmi.fused = SNFNMI),
+              identity = list(ident.1 = group.1, ident.2 = group.2, ident.fused = group)))
+}
+
+
+runSNFPipeline <- function(Data1, Data2, truelabel,
+                           K = 20, alpha = 0.5, iter = 10,
+                           down.pct = 1, C = 2){
+  require(SNFtool)
+  require(RColorBrewer)
+  #Process the data set
+  Data1 <- as.matrix(Data1[,c("V1", "V2")])
+  Data2 <- as.matrix(Data2[,c("V1", "V2")])
+  
+  #Normalization
+  Data1 = standardNormalization(Data1)
+  Data2 = standardNormalization(Data2)
+  
+  #Calculate distance
+  Dist1 = dist2(as.matrix(Data1),as.matrix(Data1));
+  Dist2 = dist2(as.matrix(Data2),as.matrix(Data2));
+  
+  ## next, construct similarity graphs
+  W1 = affinityMatrix(Dist1, K, alpha)
+  W2 = affinityMatrix(Dist2, K, alpha)
+  
+  #Run SNF
+  W = SNF(Wall = list(W1,W2), K = K, t = iter)
+  
+  
+  #Cluster
+  group = spectralClustering(W, C);
+  group.1 = spectralClustering(W1, C);
+  group.2 = spectralClustering(W2, C);
+  
+  #"Clustering results of individual and fused data views"
+  SNFNMI = calNMI(group, truelabel)
+  SNFNMI.1 = calNMI(group.1, truelabel)
+  SNFNMI.2 = calNMI(group.2, truelabel)
+  
+  return(list(affinity.matrices = list(W1 = W1, W2 = W2, W = W),
+              nmi.values = list(nmi.1 = SNFNMI.1, nmi.2 = SNFNMI.2, nmi.fused = SNFNMI),
+              identity = list(ident.1 = group.1, ident.2 = group.2, ident.fused = group)))
+}
+
+plotSNFHeatComparison <- function(all.data, truelabel, down.pct = 1){
+  require(RColorBrewer)
+  
+  #Breakout data
+  W1 <- all.data[[1]]
+  W2 <- all.data[[2]]
+  W <- all.data[[3]]
+  
+  
   ## These similarity graphs have complementary information about clusters.
   new.palette=colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
   
-  
+  #Display Data View 1
   displayClusters(W1,truelabel, main.title = "Data View 1",
                   col = rev(new.palette(100)))
+  #Display Data View 2
   displayClusters(W2,truelabel, main.title = "Data View 2",
                   col = rev(new.palette(100)))
-  
-  ## next, we fuse all the graphs
-  ## then the overall matrix can be computed by similarity network fusion(SNF):
-  W = SNF(Wall = list(W1,W2), K = K, t = iter)
-  
-  C = 2 					# number of clusters
-  group = spectralClustering(W, C); 	# the final subtypes information
-  group.1 = spectralClustering(W1, C); 	# the final subtypes information
-  group.2 = spectralClustering(W2, C); 	# the final subtypes information
-  
-  ## you can evaluate the goodness of the obtained clustering results by calculate Normalized mutual information (NMI): if NMI is close to 1, it indicates that the obtained clustering is very close to the "true" cluster information; if NMI is close to 0, it indicates the obtained clustering is not similar to the "true" cluster information.
-  #Fused Kernel heatmap
-  
-  new.palette=colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
-  
+  #Display fused kernel
   displayClusters(W, truelabel, main.title = "Fused Data View",
                   col = rev(new.palette(100)))
-  
+  #Display average kernel
   displayClusters((W1 + W2)/2, truelabel, main.title = "Average Data View",
                   col = rev(new.palette(100)))
   
-  #Downsample points
+  #Downsample points for big display
   samp.vec = c(1:nrow(W1))
   num.to.sample = floor(down.pct * nrow(W1))
   ind = sort(sample(samp.vec, num.to.sample))
   
-  ###Similarity network fusion result....
+  #Save old/default graphics parameters
+  old.par <- par(mar = c(1, 1, 1, 1),
+                 oma = c(10,0,10,0),
+                 mfrow = c(1,1))
   
-  new.palette=colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
-  
+  #3 by 1 plot for figures
   plot.new()
   par(mfrow = c(1,3), oma = c(10,0,10,0))
   displayClusters(W1[ind,ind], truelabel[ind], main.title = "Data View 1",
@@ -187,14 +242,8 @@ plotSNFHeatComparison <- function(Data1, Data2, truelabel,
                   col = rev(new.palette(100)))
   title(main = list("Effect of Data fusion on Simulated Data", cex = 2), outer=TRUE)
   
-  #"Clustering results of individual and fused data views"
-  
-  SNFNMI = calNMI(group, truelabel)
-  SNFNMI.1 = calNMI(group.1, truelabel)
-  SNFNMI.2 = calNMI(group.2, truelabel)
-  
-  return(list(nmi.fused = SNFNMI, nmi.1 = SNFNMI.1, nmi.2 = SNFNMI.2))
-  
+  #Restore old graphics parameters
+  par(old.par)
 }
 
 

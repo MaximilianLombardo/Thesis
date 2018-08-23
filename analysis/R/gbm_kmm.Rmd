@@ -4,10 +4,10 @@ author: "Maximilian Lombardo"
 date: "January 14, 2018"
 output: html_document
 params:
-  ge.txt: "C:\Thesis\data\SNF\GBM\GLIO_Gene_Expression.txt"
-  mirna.txt: "C:\Thesis\data\SNF\GBM\GLIO_Mirna_Expression.txt"
-  meth.txt: "C:\Thesis\data\SNF\GBM\GLIO_Methy_Expression.txt"
-  survival.txt: "C:\Thesis\data\SNF\GBM\GLIO_Methy_Expression.txt"
+  ge.txt: "~/Documents/gitRepos/master/data/SNF/GBM/GLIO_Gene_Expression.txt"
+  mirna.txt: "~/Documents/gitRepos/master/data/SNF/GBM/GLIO_Mirna_Expression.txt"
+  meth.txt: "~/Documents/gitRepos/master/data/SNF/GBM/GLIO_Methy_Expression.txt"
+  survival.txt: "~/Documents/gitRepos/master/data/SNF/GBM/GLIO_Methy_Expression.txt"
   
 ---
 
@@ -22,50 +22,13 @@ library(SNFtool)
 library(cluster)
 ```
 
+```{r}
+file.path = "~/Documents/gitRepos/master/analysis/R/gbm_kmm_fxns.R"
+source(file.path)
+```
 
 ```{r}
-#params <- list()
-#GBM
-
-
-chooseDataType <- function(disease){
-  params <- list()
-  
-  if(disease == "GBM"){
-    params$ge.txt <- "C:/Thesis/data/SNF/GBM/GLIO_Gene_Expression.txt"
-    params$mirna.txt <- "C:/Thesis/data/SNF/GBM/GLIO_Mirna_Expression.txt"
-    params$meth.txt <- "C:/Thesis/data/SNF/GBM/GLIO_Methy_Expression.txt"
-    params$survival.txt <- "C:/Thesis/data/SNF/GBM/GLIO_Survival.txt"
-  }else if(disease == "BREAST"){
-    params$ge.txt <- "C:/Thesis/data/SNF/Breast/BREAST_Gene_Expression.txt"
-    params$mirna.txt <- "C:/Thesis/data/SNF/Breast/BREAST_Mirna_Expression.txt"
-    params$meth.txt <- "C:/Thesis/data/SNF/Breast/BREAST_Methy_Expression.txt"
-    params$survival.txt <- "C:/Thesis/data/SNF/Breast/BREAST_Survival.txt"
-  }else if(disease == "COLON"){
-    params$ge.txt <- "C:/Thesis/data/SNF/Colon/COLON_Gene_Expression.txt"
-    params$mirna.txt <- "C:/Thesis/data/SNF/Colon/COLON_Mirna_Expression.txt"
-    params$meth.txt <- "C:/Thesis/data/SNF/Colon/COLON_Methy_Expression.txt"
-    params$survival.txt <- "C:/Thesis/data/SNF/Colon/COLON_Survival.txt"
-  }else if (disease == "KIDNEY"){
-    params$ge.txt <- "C:/Thesis/data/SNF/Kidney/KIDNEY_Gene_Expression.txt"
-    params$mirna.txt <- "C:/Thesis/data/SNF/Kidney/KIDNEY_Mirna_Expression.txt"
-    params$meth.txt <- "C:/Thesis/data/SNF/Kidney/KIDNEY_Methy_Expression.txt"
-    params$survival.txt <- "C:/Thesis/data/SNF/Kidney/KIDNEY_Survival.txt"
-  }else if(disease == "LUNG"){
-    params$ge.txt <- "C:/Thesis/data/SNF/Lung/LUNG_Gene_Expression.txt"
-    params$mirna.txt <- "C:/Thesis/data/SNF/Lung/LUNG_Mirna_Expression.txt"
-    params$meth.txt <- "C:/Thesis/data/SNF/Lung/LUNG_Methy_Expression.txt"
-    params$survival.txt <- "C:/Thesis/data/SNF/Lung/LUNG_Survival.txt"
-  }else{
-    print("data for specified disease does not exist")
-  }
-  
-  return(params)
-  
-}
-
-params <- chooseDataType("BREAST")
-
+file.locations <- chooseDataType("BREAST")
 ```
 
 
@@ -85,6 +48,23 @@ mirna <- read.table(params$mirna.txt)
 meth <- read.table(params$meth.txt)
 survival <- read.table(params$survival.txt, header = TRUE)
 
+#load in the data
+
+data.names <- c("gene","mirna", "meth", "survival")
+data.name.indices <- lapply(data.names, FUN = grepl, file.locations, ignore.case = TRUE)
+data.types <- unlist(lapply(data.name.indices, FUN = function(index){data.names[index]}))
+grep("gene",  file.locations, ignore.case = TRUE)
+
+
+data.views <- lapply(file.locations, FUN = function(locale){
+  if(grepl("survival", locale, ignore.case = TRUE)){read.table(locale, header = TRUE)}else{read.table(locale)}})
+
+
+names(data.views) <- data.types
+
+targets <- data.views$survival
+
+data.views <- data.views[setdiff(data.types, "survival")]
 ```
 
 ```{r}
@@ -105,30 +85,19 @@ rbf.ge <- rbfdot(sigma = 1/(4*nrow(ge)))
 rbf.mirna <- rbfdot(sigma = 1/(nrow(mirna)))
 rbf.meth <- rbfdot(sigma = 1/(2*nrow(meth)))
 
-#Function for actually computing the kernel matrix
-computeKernelMatrix <- function(data, kernelFunction){
-  
-  kernel <- matrix(,nrow = ncol(data), ncol = ncol(data))
-  
-  row.names(kernel) <- colnames(data)
-  colnames(kernel) <- colnames(data)
-  
-  for(i in c(1:ncol(data))){
-    for(j in c(1:ncol(data))){
-      
-      kernel[i,j] <- kernelFunction(data[,i], data[,j])
-      
-    }
-  }
-  return(kernel)
-}
+
+kernels <- list(rbf.ge, rbf.mirna, rbf.meth)
+
 
 #calls to kernel construction function
 ge.kern <- computeKernelMatrix(ge, rbf.ge)
 mirna.kern <- computeKernelMatrix(mirna, rbf.mirna)
 meth.kern <- computeKernelMatrix(meth, rbf.meth)
 
-all.kernels <- array(c(ge.kern, mirna.kern, meth.kern), dim = c(nrow(ge.kern), ncol(ge.kern), 3))
+kernel.list <- lapply(c(1:length(data.views)), FUN = function(idx){computeKernelMatrix(data.views[idx], kernels[idx])})
+
+
+all.kernels <- array(unlist(kernel.list), dim = c(nrow(kernel.list[1]), ncol(kernel.list[1]), length(kernel.list)))
 
 ```
 
@@ -137,25 +106,6 @@ all.kernels <- array(c(ge.kern, mirna.kern, meth.kern), dim = c(nrow(ge.kern), n
 #Calculating the similarity matrix for target variables
 
 #An attempt at Kernel-Target Alignment to optimize sigma parameter on RBF kernel. 
-
-computeKernelMatrix1D <- function(data){
-  
-  kernel <- matrix(,nrow = length(data$Survival), ncol = length(data$Survival))
-  
-  row.names(kernel) <- data$PatientID
-  colnames(kernel) <- data$PatientID
-  
-  for(i in c(1:length(data$Survival))){
-    for(j in c(1:length(data$Survival))){
-      
-      kernel[i,j] <- sqrt((data$Survival[i] - data$Survival[j])^2)
-      
-    }
-  }
- # kernel <- abs(kernel - 1)
-  return(1 - (kernel/max(kernel)))
-}
-
 survival.similarity <- computeKernelMatrix1D(survival)
 
 hist(survival.similarity)
@@ -170,47 +120,8 @@ image(survival.similarity[order(survival$Survival), order(survival$Survival)])
 ```{r}
 #kernel Target alignment function
 
-kernel.distance <- function(K1, K2){
-  K <- abs(K1 - K2)
-  return(norm(K, 'f'))
-}
+data.views.kern.kl <- lapply(data.views, kernelTargetAlignment, survival.similarity)
 
-return.best.kernel <- function(kernel.variations, target.kernel){
-  distances <- unlist(lapply(kernel.variations, FUN = kernel.distance, target.kernel))
-  return(kernel.variations[[which.min(distances)]])
-}
-
-#Generate kernels with different hyperparameters for selection...
-
-generate.kernels <- function(data){
-  kernels <- list()
-  #sigmas <- c(1:2 %o% 10^-(0:5))
-  sigmas <- c(1:9 %o% 10^-(4:5))
-  for(i in 1:length(sigmas)){
-    #print(i)
-    rbf <- rbfdot(sigma = sigmas[i])
-    kernels[[i]] <- computeKernelMatrix(data, rbf)
-  }
-  return(kernels)
-}
-
-#return.best.kernel <- function(data, target.kernel){
-#  kernels <- generate.kernels(data)
-#  best.kernel <- return.best.kernel(kernels, target.kernel)
-#  return(best.kernel)
-#}
-
-ge.kernels <- generate.kernels(ge)
-ge.kern <- return.best.kernel(ge.kernels, survival.similarity)
-ge.kern.kl <- as.kernelMatrix(ge.kern)
-
-mirna.kernels <- generate.kernels(mirna)
-mirna.kern <- return.best.kernel(mirna.kernels, survival.similarity)
-mirna.kern.kl <- as.kernelMatrix(mirna.kern)
-
-meth.kernels <- generate.kernels(meth)
-meth.kern <- return.best.kernel(meth.kernels, survival.similarity)
-meth.kern.kl <- as.kernelMatrix(meth.kern)
 ```
 
 ```{r}

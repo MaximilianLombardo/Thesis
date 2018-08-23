@@ -81,19 +81,30 @@ plotSimDataScatter(dat = misclass.sim$misclassification.2[,c("V1", "V2")],
 ```{r}
 #Figure 2 Similarity Network Fusion Heat Comparison
 #Scenario A - inverted labels
-a.nmi <- plotSNFHeatComparison(Data1 = inverted.sim$classes,
-                               Data2 = inverted.sim$inverted.classes,
+
+snf.a <- runSNFPipeline(Data1 = inverted.sim$classes,
+                        Data2 = inverted.sim$inverted.classes,
+                        truelabel = inverted.sim$true.label)
+a.nmi <- plotSNFHeatComparison(all.data = snf.a$affinity.matrices,
                                truelabel = inverted.sim$true.label)
 
 #Scenario B - Noisy views
-b.nmi <- plotSNFHeatComparison(Data1 = noise.sim$gaussian.noise,
-                               Data2 = noise.sim$gamma.noise,
+snf.b <- runSNFPipeline(Data1 = noise.sim$gaussian.noise,
+                        Data2 = noise.sim$gamma.noise,
+                        truelabel = noise.sim$true.label,
+                        alpha = 10, down.pct = 0.2)
+b.nmi <- plotSNFHeatComparison(all.data = snf.b$affinity.matrices,
                                truelabel = noise.sim$true.label,
-                               alpha = 10, down.pct = 0.2)
+                               down.pct = 0.2)
 #Scenario C - misclassification
+snf.c <- runSNFPipeline(Data1 = misclass.sim$misclassification.1,
+                        Data2 = misclass.sim$misclassification.2,
+                        truelabel = misclass.sim$true.label,
+                        alpha = 10, down.pct = 0.2)
 c.nmi <- plotSNFHeatComparison(Data1 = misclass.sim$misclassification.1,
                                Data2 = misclass.sim$misclassification.2,
-                               truelabel = misclass.sim$true.label)
+                               truelabel = misclass.sim$true.label,
+                               down.pct = 0.2))
 
 ```
 
