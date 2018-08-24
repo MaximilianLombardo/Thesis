@@ -203,6 +203,7 @@ mkkmeans_train <- function(Km, parameters) {
 
 ```{r}
 mkkmeans_train_alternate <- function(Km, parameters) {
+  require(Rmosek)
   state <- list()
   
     P <- dim(Km)[3]
