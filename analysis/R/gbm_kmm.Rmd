@@ -65,6 +65,12 @@ names(data.views) <- data.types
 targets <- data.views$survival
 
 data.views <- data.views[setdiff(data.types, "survival")]
+
+#For sampling features and samples -- dev work
+source("~/Documents/gitRepos/master/utils/samplingFxns.R")
+
+data.views <- lapply(data.views, sampleRows, 100)
+
 ```
 
 ```{r}

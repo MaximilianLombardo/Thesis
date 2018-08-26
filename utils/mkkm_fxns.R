@@ -1,7 +1,6 @@
 runMKKMPipeline <- function(data.views, truelabel,
                             K = 20, alpha = 0.5, iter = 10,
                             down.pct = 1, C = 2,
-                            fxn.path = "~/Documents/uva/master/the/lmkkmeans-master/",
                             simulation = FALSE,
                             kernel.normalization = TRUE,
                             choose.variable.genes = FALSE,
@@ -14,10 +13,11 @@ runMKKMPipeline <- function(data.views, truelabel,
   require(rlist)
   
   #Process the data set
-  data.views <- preProcessData()
+  data.views <- preProcessData(data.views)
   
   
-  #Calculate kernel/similarity matrices --- standardize matrices for comparison --- transform into a matrix array
+  #Calculate kernel/similarity matrices  --kernel parameter optimization --- 
+  #standardize matrices for comparison --- transform into a matrix array
   kernels <- lapply(c(1:length(data.views)), FUN = function(idx){chooseKernel(data.views[[idx]])})
   kernels <- lapply(c(1:length(kernels)), FUN = function(idx){StandardizeKernel(kernels[[idx]])})
   kernel.array <- do.call(abind, c(kernels, list(along = 3)))
@@ -168,6 +168,21 @@ chooseKernel <- function(data.view, type = "nn", k = 30){
   }
 }
 
+################################
+optimizeKernelParam <- function(data.view, params){
+  
+}
+
+
+rbfKernel <- function(data.view){
+  require(kernlab)
+  
+  param.choices.log <- c(1 * 10^(-2:3))
+  kernels.log <- lapply(param.choices.log, FUN = rbfdot(sigma = )
+  
+  
+}
+################################
 jaccardKernel <- function(neighbors){
   require(vegan)
   require(parallel)
