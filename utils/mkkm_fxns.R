@@ -11,6 +11,8 @@ runMKKMPipeline <- function(data.views, truelabel,
   require(abind)
   require(MKKC)
   require(rlist)
+  require(clValid)
+  require(psych)
   
   #Process the data set
   data.views <- preProcessData(data.views)
@@ -18,8 +20,9 @@ runMKKMPipeline <- function(data.views, truelabel,
   
   #Calculate kernel/similarity matrices  --kernel parameter optimization --- 
   #standardize matrices for comparison --- transform into a matrix array
-  kernels <- lapply(c(1:length(data.views)), FUN = function(idx){chooseKernel(data.views[[idx]])})
-  kernels <- lapply(c(1:length(kernels)), FUN = function(idx){StandardizeKernel(kernels[[idx]])})
+  #kernels <- lapply(c(1:length(data.views)), FUN = function(idx){chooseKernel(data.views[[idx]])}) -- Jaccard Kernel function
+  kernels <- lapply(c(1:length(data.views)), FUN = function(idx){optimizeRBFKernel(data.views[[idx]])})#Optimized Kernels based on KSdist
+  #kernels <- lapply(c(1:length(kernels)), FUN = function(idx){StandardizeKernel(kernels[[idx]])}) -- don't do normalization???
   kernel.array <- do.call(abind, c(kernels, list(along = 3)))
   
   mkkm.model <- parallel::mclapply(c(2:10), FUN = function(k){runMKKM(kernel.array, clusters = k)})
@@ -28,32 +31,63 @@ runMKKMPipeline <- function(data.views, truelabel,
   model.clustering <- lapply(mkkm.model, FUN = function(model){model$state$clustering})
   model.kernel.coefficients <- lapply(mkkm.model, FUN = function(model){model$state$theta})
   
+  #Normalized mutual information for when we know the labels
   mkkc.nmi <- lapply(model.clustering, FUN = function(clustering){NormMI(truelabel, model.clustering)})
+  
+  #Internal measures for when we do not know the true labels...
+  #calculate distances
+  
+  data.views.dr <- lapply(data.views, FUN = function(data.view){prcomp(t(data.view), rank. = 100)$x})
+  dists <- lapply(data.views.dr, FUN = function(data.view){dist(data.view, method = "manhattan")})
+  quality.metrics <- lapply(dists, calcInternalClusterQualityMeasures, models)
 
-  #################################################################################################################
   
-  ## next, construct similarity graphs
-  W1 = affinityMatrix(Dist1, K, alpha)
-  W2 = affinityMatrix(Dist2, K, alpha)
+  #Feature/cluster id mutual information based cluster number optimization
+
+  mi. <-  
+
+  #Choose the optimal clustering parameter setting based on dunn index and return relevant 
   
-  #Run SNF
-  W = SNF(Wall = list(W1,W2), K = K, t = iter)
-  
-  
-  #Cluster
-  group = spectralClustering(W, C);
-  group.1 = spectralClustering(W1, C);
-  group.2 = spectralClustering(W2, C);
-  
-  #"Clustering results of individual and fused data views"
-  SNFNMI = calNMI(group, truelabel)
-  SNFNMI.1 = calNMI(group.1, truelabel)
-  SNFNMI.2 = calNMI(group.2, truelabel)
-  
+  which.min(quality.metrics[])
+
   return(list(affinity.matrices = list(W1 = W1, W2 = W2, W = W),
               nmi.values = list(nmi.1 = SNFNMI.1, nmi.2 = SNFNMI.2, nmi.fused = SNFNMI),
               identity = list(ident.1 = group.1, ident.2 = group.2, ident.fused = group)))
 }
+
+chooseClustersMI <- function(data.view){
+  require(parallell)
+  require(infotheo)
+  
+  features <- split(data.view, col(data.view))
+  
+  mean.mut.info <- mclapply(clusterings, FUN = function(clustering){mean(unlist(lapply(features, FUN = function(feature){mutinformation(clustering, feature)})))}, mc.cores = 11)
+  
+  split(dvr, rep(1:ncol(dvr), each = nrow(dvr)))
+  
+   <- 
+}
+
+calcFeatureMI <- function(features, clustering){
+  require(infotheo)
+  
+  mean.mut.info <- lapply(features, FUN = function(feature){mutinformation(feature, clustering)})
+  
+}
+
+
+
+calcInternalClusterQualityMeasures <- function(experimental.dist, models){
+  require(clValid)
+  quality.metrics <- list()
+  clusterings <- lapply(c(1:length(models)), FUN = function(idx){models[[idx]]$state$clustering})
+  quality.metrics$connectivity.scores <- unlist(lapply(clusterings, FUN = function(clustering){connectivity(distance = experimental.dist, clusters = clustering)}))
+  quality.metrics$dunn <- unlist(lapply(clusterings, FUN = function(clustering){dunn(distance = experimental.dist, clusters = clustering)}))
+  quality.metrics$silhouette <- unlist(lapply(clusterings, FUN = function(clustering){mean(silhouette(clustering, dist = experimental.dist)[,"sil_width"])}))
+  
+  return(quality.metrics)
+}
+
 
 preProcessData <- function(data.views, simulation, choose.variable.genes, prcomp){
   #Process the data set
@@ -169,19 +203,63 @@ chooseKernel <- function(data.view, type = "nn", k = 30){
 }
 
 ################################
-optimizeKernelParam <- function(data.view, params){
-  
-}
-
-
-rbfKernel <- function(data.view){
+optimizeRBFKernel <- function(data.view){
   require(kernlab)
+  require(parallel)
+  require(FNN)
   
-  param.choices.log <- c(1 * 10^(-2:3))
-  kernels.log <- lapply(param.choices.log, FUN = rbfdot(sigma = )
+  param.choices.log <- c(1 * 10^(-8:3))
+  kernels.log <- lapply(param.choices.log, FUN = rbfdot)
   
+  log.features <- mclapply(kernels.log,
+                           FUN = function(kernel){computeKernelMatrix(data.view, kernelFunction = kernel)},
+                           mc.cores = (detectCores()-1))
   
+  #Choose best kernel parameter based on KL divergence...resultoing distribution of values in kernel should be close to beta distribution
+  #Centered around 0.5, with values between 0 and 1 (symmetric)
+  
+ test.results <- lapply(log.features, FUN = computeKSDist)
+ min.idx <- which.min(test.results)
+ 
+ #Test different parameter values on a linear scale based on the "optimal" value from above
+ param.choices.linear <- unlist(lapply(param.choices.log[c((min.idx -1) : (min.idx + 1))],
+                                         FUN = function(scale.value){scale.value * seq(1,10, 2)}))
+ kernels.linear <- lapply(param.choices.linear, FUN = rbfdot)
+ linear.features <- mclapply(kernels.linear,
+                             FUN = function(kernel){computeKernelMatrix(data.view, kernelFunction = kernel)},
+                             mc.cores = (detectCores()-1))
+ #Calculate distances again
+ test.results <- lapply(linear.features, FUN = computeKSDist)
+ min.idx <- which.min(test.results)
+ 
+ return(linear.features[[min.idx]])
+ 
 }
+
+
+computeKSDist <- function(kern){
+  test.result <- suppressWarnings(ks.test(x = c(kern), y = rbeta(length(kern), shape1 = 2, shape2 = 2)))
+  return(test.result[["statistic"]])
+}
+
+computeKernelMatrix <- function(data, kernelFunction){
+  
+  kernel <- matrix( ,nrow = ncol(data), ncol = ncol(data))
+  
+  row.names(kernel) <- colnames(data)
+  colnames(kernel) <- colnames(data)
+  
+  for(i in c(1:ncol(data))){
+    for(j in c(1:ncol(data))){
+      
+      kernel[i,j] <- kernelFunction(data[,i], data[,j])
+      
+    }
+  }
+  return(kernel)
+}
+
+trace <- function(data)sum(diag(data))
 ################################
 jaccardKernel <- function(neighbors){
   require(vegan)
