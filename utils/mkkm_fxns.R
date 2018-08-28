@@ -25,7 +25,7 @@ runMKKMPipeline <- function(data.views, truelabel,
   #kernels <- lapply(c(1:length(kernels)), FUN = function(idx){StandardizeKernel(kernels[[idx]])}) -- don't do normalization???
   kernel.array <- do.call(abind, c(kernels, list(along = 3)))
   
-  mkkm.model <- parallel::mclapply(c(2:10), FUN = function(k){runMKKM(kernel.array, clusters = k)})
+  mkkm.model <- parallel::mclapply(c(2:50), FUN = function(k){runMKKM(kernel.array, clusters = k)})
   
   combined.kernels <- lapply(mkkm.model, FUN = function(model){model$combined.kernel})
   model.clustering <- lapply(mkkm.model, FUN = function(model){model$state$clustering})
@@ -38,14 +38,31 @@ runMKKMPipeline <- function(data.views, truelabel,
   #calculate distances
   
   data.views.dr <- lapply(data.views, FUN = function(data.view){prcomp(t(data.view), rank. = 100)$x})
-  dists <- lapply(data.views.dr, FUN = function(data.view){dist(data.view, method = "manhattan")})
-  quality.metrics <- lapply(dists, calcInternalClusterQualityMeasures, models)
-
   
+  if(dist.type = "cor"){
+    
+    dists <- lapply(data.views, function(data.view){as.dist((1 - cor(data.view))/2)})
+    
+  }else{
+    dists <- lapply(data.views.dr, FUN = function(data.view){dist(data.view, method = dist.type)})
+  }
+  
+  quality.metrics <- lapply(dists, calcInternalClusterQualityMeasures, mkkm.model)
+  
+  plotInternalQulaitymetrics()
+
   #Feature/cluster id mutual information based cluster number optimization
 
-  mi. <-  
+  #PC based
+  average.cluster.mi <- lapply(data.views.dr, FUN = function(data.view){chooseClustersMI(data.view, model.clustering)})
 
+  #Gene based ------
+  features.use <- lapply(data.views, FUN = function(data.view){chooseVariableFeatures(data.view)})
+  average.cluster.mi <- lapply(data.views, FUN = function(data.view){chooseClustersMI(data.view, model.clustering, features.use)})
+  
+  
+  
+  
   #Choose the optimal clustering parameter setting based on dunn index and return relevant 
   
   which.min(quality.metrics[])
@@ -53,30 +70,46 @@ runMKKMPipeline <- function(data.views, truelabel,
   return(list(affinity.matrices = list(W1 = W1, W2 = W2, W = W),
               nmi.values = list(nmi.1 = SNFNMI.1, nmi.2 = SNFNMI.2, nmi.fused = SNFNMI),
               identity = list(ident.1 = group.1, ident.2 = group.2, ident.fused = group)))
+
 }
+##############################################################################################################33333
+chooseClustersMI <- function(data.view, clusterings, num.pcs = 1:20, features.use = TRUE){
+  require(parallel)
 
-chooseClustersMI <- function(data.view){
-  require(parallell)
-  require(infotheo)
+  if(!is.null(features.use)){
+    features <- split(data.view[features.use,], row(data.view))
+  }else{
+    features <- split(data.view[,num.pcs], col(data.view))
+  }
   
-  features <- split(data.view, col(data.view))
   
-  mean.mut.info <- mclapply(clusterings, FUN = function(clustering){mean(unlist(lapply(features, FUN = function(feature){mutinformation(clustering, feature)})))}, mc.cores = 11)
+  mean.mut.info <- mclapply(clusterings, FUN = function(clustering){calcFeatureMI(features, clustering)}, mc.cores = (detectCores() - 1))
   
-  split(dvr, rep(1:ncol(dvr), each = nrow(dvr)))
-  
-   <- 
+  return(mean.mut.info)
 }
-
-calcFeatureMI <- function(features, clustering){
-  require(infotheo)
+##############################################################################################################
+calcFeatureMI <- function(features, clustering, num.pcs = NULL, genes = TRUE){
+  require(mpmi)
+  if(genes){
+    mean.mut.info <- mean(unlist(lapply(features, FUN = function(feature){mmi.pw(feature, clustering)$mi})))
+    
+  }else{
+    mean.mut.info <- mean(unlist(lapply(features[num.pcs], FUN = function(feature){mmi.pw(feature, clustering)$mi})))
+    
+  }
   
-  mean.mut.info <- lapply(features, FUN = function(feature){mutinformation(feature, clustering)})
   
+  return(mean.mut.info)
 }
-
-
-
+##############################################################################################################
+chooseVariableFeatures <- function(data.view, feat.var.thresh = 6){
+  feature.idx <- apply(data.view, 1, FUN = function(feature){any(feature > feat.var.thresh)})
+  
+  variable.features <- names(feature.idx[feature.idx])
+  
+  return(variable.features)
+}
+##############################################################################################################
 calcInternalClusterQualityMeasures <- function(experimental.dist, models){
   require(clValid)
   quality.metrics <- list()
@@ -87,8 +120,9 @@ calcInternalClusterQualityMeasures <- function(experimental.dist, models){
   
   return(quality.metrics)
 }
+##############################################################################################################
 
-
+##############################################################################################################
 preProcessData <- function(data.views, simulation, choose.variable.genes, prcomp){
   #Process the data set
   if(simulation){
@@ -116,7 +150,7 @@ preProcessData <- function(data.views, simulation, choose.variable.genes, prcomp
   if(prcomp){TODO principal components analysis}
   
 }
-
+  ##############################################################################################################
 runMKKM <- function(kernel.array, clusters = 2, iter = 10){
   #source(fxn.location)
   require(MKKC)
@@ -136,7 +170,7 @@ runMKKM <- function(kernel.array, clusters = 2, iter = 10){
   return(model)
   
 }
-
+##############################################################################################################
 combineKernels <- function(kernels, kernel.params){
   for(i in 1:length(kernel.params)){
     #print(i)
@@ -144,7 +178,7 @@ combineKernels <- function(kernels, kernel.params){
   }
   return(apply(kernels, c(1,2), sum))
 }
-
+##############################################################################################################
 mkkmeans_train <- function(Km, parameters) {
   require(Rmosek)
   state <- list()
@@ -190,7 +224,7 @@ mkkmeans_train <- function(Km, parameters) {
   return(state)
 }
 
-
+##############################################################################################################
 chooseKernel <- function(data.view, type = "nn", k = 30){
   require(vegan)
   
@@ -202,7 +236,7 @@ chooseKernel <- function(data.view, type = "nn", k = 30){
   }
 }
 
-################################
+##############################################################################################################
 optimizeRBFKernel <- function(data.view){
   require(kernlab)
   require(parallel)
@@ -236,12 +270,12 @@ optimizeRBFKernel <- function(data.view){
  
 }
 
-
+##############################################################################################################
 computeKSDist <- function(kern){
   test.result <- suppressWarnings(ks.test(x = c(kern), y = rbeta(length(kern), shape1 = 2, shape2 = 2)))
   return(test.result[["statistic"]])
 }
-
+##############################################################################################################
 computeKernelMatrix <- function(data, kernelFunction){
   
   kernel <- matrix( ,nrow = ncol(data), ncol = ncol(data))
@@ -258,9 +292,9 @@ computeKernelMatrix <- function(data, kernelFunction){
   }
   return(kernel)
 }
-
+##############################################################################################################
 trace <- function(data)sum(diag(data))
-################################
+##############################################################################################################
 jaccardKernel <- function(neighbors){
   require(vegan)
   require(parallel)
@@ -280,8 +314,7 @@ jaccardKernel <- function(neighbors){
   
   return(mat)
 }
-
-
+##############################################################################################################
 getNearestNeighbors <- function(data.view, k){
   require(FNN)
   
@@ -290,9 +323,10 @@ getNearestNeighbors <- function(data.view, k){
   rownames(neighbors) <- colnames(data.view)
   return(neighbors)
 }
-
+##############################################################################################################
 normalizeKernel <- function(kernel){
   #Normalizing the kernel as per chapter 5 in kernel methods for pattern analysis
   D <- diag(1./sqrt(diag(kernel)))
   kernel <- D * kernel * D
+  return(kernel)
 }

@@ -1,5 +1,44 @@
 ############################################################################################################################################3
 #Plotting functions
+
+plotInternalQulaitymetrics <- function(quality.metrics, data.views.names){
+  require(cowplot)
+  
+  sils <-lapply(quality.metrics, FUN = function(quality.metric){quality.metric$silhouette})
+  names(sils) <- data.views.names
+  dunns <-lapply(quality.metrics, FUN = function(quality.metric){quality.metric$dunn})
+  names(dunns) <- data.views.names
+  
+  connectivities <-lapply(quality.metrics, FUN = function(quality.metric){quality.metric$connectivity})
+  names(connectivities) <- data.views.names
+  
+  plot_grid(qualityTriPlot(sils, data.views.names),
+               qualityTriPlot(dunns, data.views.names, y.lab = "Dunn Index"),
+               qualityTriPlot(connectivities, data.views.names, y.lab = "Connectivity Score"), nrow = 1)
+}
+
+qualityTriPlot <- function(measures, data.views.names, x.lab = "Number of Clusters", y.lab = "Silhouette Score", main.title = "", max.ident = TRUE){
+  require(ggplot2)
+  require(data.table)
+  require(dplyr)
+  
+  measure.dfs <- lapply(measures, FUN = function(measure){data.frame(measure, clusters = c(1:length(measure) + 1))})
+  df <- rbindlist(measure.dfs, idcol = "Data.View")
+  
+  if(max.ident){
+    extrema <- aggregate(measure ~ Data.View, data = df, max)
+    extrema.pts <- which(df$measure %in% extrema$measure)
+  }
+  
+  g <- ggplot(df, aes(x = clusters, y = measure, color = Data.View)) + geom_point() +
+    geom_point(data=df[extrema.pts, ], aes(x=clusters, y=measure, color = Data.View), size=5, shape = 8)
+  g <- g + xlab(x.lab) + ylab(y.lab) + ggtitle(main.title)
+
+  g
+  
+  return(g)
+}
+
 plotSNFHeatComparison <- function(all.data, truelabel, down.pct = 1){
   require(RColorBrewer)
   
