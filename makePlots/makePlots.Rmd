@@ -12,9 +12,18 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #Making figures using simulated data
 #Make sure to have local version of SNFTool installed
-file.path <- "~/Documents/uva/master/the/utils/simMVData.R" 
-#file.path <- "~/Documents/gitRepos//master/utils/simMVData.R"
-source(file.path)
+#Load utility functions
+#file.path <- "~/Documents/uva/master/the/utils/simMVData.R" 
+util.fxns <- "~/Documents/gitRepos/master/utils/simMVData.R"
+source(util.fxns)
+snf.fxns <- "~/Documents/gitRepos/master/utils/snf_fxns.R"
+source(snf.fxns)
+###Clean up this particular set of functions, redundant
+#exp.plot.fxns <- "~/Documents/gitRepos/master/utils/simulatedExploratoryPlots.R"
+#source(exp.plot.fxns)
+plotting.fxns <- "~/Documents/gitRepos/master/utils/plotting_fxns.R"
+source(plotting.fxns)
+
 
 ```
 
@@ -33,27 +42,28 @@ inverted.sim <- processSNFData(Data1, Data2, labels)
 
 
 #Data and Labels for simulated scenario B
-noise.sim <- simulateNoisyData(gaussian.noise = 3, gamma.noise = 2)
+noise.sim <- simulateNoisyData(gaussian.noise = 3, gamma.noise = 4)
 
 #Data and labels for simulated Scenario C
-misclass.sim <- simulateMisclassificationData(num = 1000, rad = 2.2)
+#misclass.sim <- simulateMisclassificationData(num = 1000, rad = 2.2)
+perturb.sim <- simulatePerturbationData(num = 1000, pct.switch = 0.2)
 ```
 
 
 ```{r}
-
+#Chapter 4 Figures
 #Figure 1 Individual Simulated Data Scatter Views
 
 #Scenario A - Inverted Labels - variable class definition
-plotSimDataScatter(dat = inverted.sim$classes[,c("V1", "V2")],
-                   lab = inverted.sim$classes[,c("label")],
-                   main.title =  "View 1 Classfication")
-plotSimDataScatter(dat = inverted.sim$inverted.classes[,c("V1", "V2")],
-                   lab = inverted.sim$inverted.classes[,c("label")],
-                   main.title =  "View 2 Inverted Classification")
+#plotSimDataScatter(dat = inverted.sim$classes[,c("V1", "V2")],
+#                   lab = inverted.sim$classes[,c("label")],
+#                   main.title =  "View 1 Classfication")
+#plotSimDataScatter(dat = inverted.sim$inverted.classes[,c("V1", "V2")],
+#                   lab = inverted.sim$inverted.classes[,c("label")],
+#                   main.title =  "View 2 Inverted Classification")
 
 
-
+#Add more types of noise to this figure and get rid of second portion?
 #Scenario B Gaussian and Gamma Noise added to ground truth
 plotSimDataScatter(dat = noise.sim$ground.truth[,c("V1", "V2")],
                    lab = noise.sim$ground.truth[,c("label")],
@@ -66,19 +76,22 @@ plotSimDataScatter(dat = noise.sim$gamma.noise[,c("V1", "V2")],
                    main.title =  "Noisy Simulated Data Gamma Noise")
 
 # Scenario C Misclassification on the Boundaries of Groups
-plotSimDataScatter(dat = misclass.sim$ground.truth[,c("V1", "V2")],
-                   lab = misclass.sim$ground.truth[,c("label")],
-                   main.title =  "Misclassification Simulation Ground Truth")
-plotSimDataScatter(dat = misclass.sim$misclassification.1[,c("V1", "V2")],
-                   lab = misclass.sim$misclassification.1[,c("label")],
-                   main.title =  "Misclassification Simulation Scenario 1")
-plotSimDataScatter(dat = misclass.sim$misclassification.2[,c("V1", "V2")],
-                   lab = misclass.sim$misclassification.2[,c("label")],
-                   main.title =  "Misclassification Simulation Scenario 2")
+plotSimDataScatter(dat = perturb.sim$ground.truth[,c("V1", "V2")],
+                   lab = perturb.sim$ground.truth[,c("label")],
+                   main.title =  "Perturbation Simulation Ground Truth")
+plotSimDataScatter(dat = perturb.sim$perturbation.1[,c("V1", "V2")],
+                   lab = perturb.sim$perturbation.1[,c("label")],
+                   main.title =  "Perturbation Simulation Scenario 1")
+plotSimDataScatter(dat = perturb.sim$perturbation.2[,c("V1", "V2")],
+                   lab = perturb.sim$perturbation.2[,c("label")],
+                   main.title =  "Perturbation Simulation Scenario 2")
 
 ```
 
+
+
 ```{r}
+#Chapter 4 Figures
 #Figure 2 Similarity Network Fusion Heat Comparison
 #Scenario A - inverted labels
 
@@ -92,28 +105,46 @@ a.nmi <- plotSNFHeatComparison(all.data = snf.a$affinity.matrices,
 snf.b <- runSNFPipeline(Data1 = noise.sim$gaussian.noise,
                         Data2 = noise.sim$gamma.noise,
                         truelabel = noise.sim$true.label,
-                        alpha = 10, down.pct = 0.2)
+                        alpha = 1, down.pct = 0.2)
 b.nmi <- plotSNFHeatComparison(all.data = snf.b$affinity.matrices,
                                truelabel = noise.sim$true.label,
                                down.pct = 0.2)
-#Scenario C - misclassification
-snf.c <- runSNFPipeline(Data1 = misclass.sim$misclassification.1,
-                        Data2 = misclass.sim$misclassification.2,
-                        truelabel = misclass.sim$true.label,
-                        alpha = 10, down.pct = 0.2)
-c.nmi <- plotSNFHeatComparison(Data1 = misclass.sim$misclassification.1,
-                               Data2 = misclass.sim$misclassification.2,
-                               truelabel = misclass.sim$true.label,
-                               down.pct = 0.2))
+#Scenario C - perturbation
+snf.c <- runSNFPipeline(Data1 = perturb.sim$perturbation.1,
+                        Data2 = perturb.sim$perturbation.2,
+                        truelabel = perturb.sim$true.label,
+                        alpha = 1, down.pct = 0.2, K = 20)
+c.nmi <- plotSNFHeatComparison(all.data = snf.c$affinity.matrices,
+                               truelabel = perturb.sim$true.label,
+                               down.pct = 0.2)
 
 ```
 
 ```{r}
-#Figure 3 - K means multiple kernel learning as implemented by Mehmet Gonen
+#Chapter 4 Figures -- normalized mutual information histograms -- should I add multiple kernel learning here?
+
+NMI.values <- c(unlist(snf.b$nmi.values), unlist(snf.c$nmi.values))
+
+Simulated.Data <- factor(c(rep("Noise Simulation", 3), rep("Boundary Misclassification", 3)),
+                         levels = c("Noise Simulation", "Boundary Misclassification"))
+
+Views <- factor(rep(c("View 1", "View 2", "Fused"), 2), levels = c("View 1", "View 2", "Fused"))
+#levels(conditions) <- c("View 1", "View 2", "Fused")
+
+nmi.data <- data.frame(Simulated.Data, Views, NMI.values)
+
+ggplot(nmi.data, aes(fill = Views, y = NMI.values, x = Simulated.Data)) +
+  geom_bar(aes(fill = Views), stat = "identity", position = "dodge")
+
+```
+
+
+```{r}
+#Figure 4 - K means multiple kernel learning as implemented by Mehmet Gonen
 source.path <- "~/Documents/gitRepos/master/lmkkmeans-master"
 
 
-e.nmi <- plotMKLKMHeatComparison(Data1 = inverted.sim$classes,
-                               Data2 = inverted.sim$inverted.classes,
-                               truelabel = inverted.sim$true.label)
+e.nmi <- plotMKLKMHeatComparison(Data1 = noise.sim$gaussian.noise,
+                               Data2 = noise.sim$gamma.noise,
+                               truelabel = noise.sim$true.label)
 ```

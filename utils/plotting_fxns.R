@@ -52,41 +52,49 @@ plotSNFHeatComparison <- function(all.data, truelabel, down.pct = 1){
   new.palette=colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
   
   #Display Data View 1
-  displayClusters(W1,truelabel, main.title = "Data View 1",
-                  col = rev(new.palette(100)))
+  #displayClusters(W1,truelabel, main.title = "Data View 1",
+  #                col = rev(new.palette(100)))
   #Display Data View 2
-  displayClusters(W2,truelabel, main.title = "Data View 2",
-                  col = rev(new.palette(100)))
+  #displayClusters(W2,truelabel, main.title = "Data View 2",
+  #                col = rev(new.palette(100)))
   #Display fused kernel
-  displayClusters(W, truelabel, main.title = "Fused Data View",
-                  col = rev(new.palette(100)))
+  #displayClusters(W, truelabel, main.title = "Fused Data View",
+  #                col = rev(new.palette(100)))
   #Display average kernel
-  displayClusters((W1 + W2)/2, truelabel, main.title = "Average Data View",
-                  col = rev(new.palette(100)))
+  #displayClusters((W1 + W2)/2, truelabel, main.title = "Average Data View",
+  #                col = rev(new.palette(100)))
   
   #Downsample points for big display
   samp.vec = c(1:nrow(W1))
   num.to.sample = floor(down.pct * nrow(W1))
   ind = sort(sample(samp.vec, num.to.sample))
   
-  #Save old/default graphics parameters
-  old.par <- par(mar = c(1, 1, 1, 1),
-                 oma = c(10,0,10,0),
-                 mfrow = c(1,1))
-  
-  #3 by 1 plot for figures
-  plot.new()
-  par(mfrow = c(1,3), oma = c(10,0,10,0))
   displayClusters(W1[ind,ind], truelabel[ind], main.title = "Data View 1",
                   col = rev(new.palette(100)))
   displayClusters(W2[ind,ind], truelabel[ind], main.title = "Data View 2",
                   col = rev(new.palette(100)))
   displayClusters(W[ind,ind], truelabel[ind], main.title = "Fused Data Views",
                   col = rev(new.palette(100)))
-  title(main = list("Effect of Data fusion on Simulated Data", cex = 2), outer=TRUE)
+
+
+  #Save old/default graphics parameters
+  #old.par <- par(mar = c(1, 1, 1, 1),
+  #               oma = c(10,0,10,0),
+  #               mfrow = c(1,1))
   
-  #Restore old graphics parameters
-  par(old.par)
+  #3 by 1 plot for figures
+  #plot.new()
+  #par(mfrow = c(1,3), oma = c(10,0,10,0))
+  #displayClusters(W1[ind,ind], truelabel[ind], main.title = "Data View 1",
+  #                col = rev(new.palette(100)))
+  #displayClusters(W2[ind,ind], truelabel[ind], main.title = "Data View 2",
+  #                col = rev(new.palette(100)))
+  #displayClusters(W[ind,ind], truelabel[ind], main.title = "Fused Data Views",
+  #                col = rev(new.palette(100)))
+  #title(main = list("Effect of Data fusion on Simulated Data", cex = 2), outer=TRUE)
+  #
+  ##Restore old graphics parameters
+  #par(old.par)
 }
 
 ###Not Needed???
@@ -158,5 +166,5 @@ plotSimDataScatter <- function(dat, lab, main.title){
   colnames(dat) <- c("V1", "V2")
   
   plt <- ggplot(data.frame(dat), aes(x = V1, y = V2, color = factor(lab))) + geom_point() 
-  plt + ggtitle(main.title) + labs(colour = "True Identity")
+  plt + ggtitle(main.title) + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "True Identity")
 }

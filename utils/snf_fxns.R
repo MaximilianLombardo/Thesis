@@ -40,6 +40,53 @@ runSNFPipeline <- function(Data1, Data2, truelabel,
 }
 
 
+runSNFPipeline2 <- function(data.views, truelabel = NULL,
+                           K = 20, alpha = 0.5, iter = 10,
+                           down.pct = 1, C = 2){
+  require(SNFtool)
+  require(RColorBrewer)
+  
+  #Temporary
+  data.views <- chooseDataType("GBM")
+  data.views <- lapply(data.views, FUN = read.table)
+  names(data.views) <- c("ge", "meth", "mirna", "survival")
+  
+  survival <- data.views$survival
+  data.views <- data.views[-4]
+  
+  #Process the data set
+  data.views <- lapply(data.views, FUN = function(view){t(as.matrix(view))})
+  
+  #Normalization
+  data.views <- lapply(data.views, FUN = standardNormalization)
+  
+  #Calculate distance
+  data.views <- lapply(data.views, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
+
+  ## next, construct similarity graphs
+  data.views <- lapply(data.views, FUN = affinityMatrix, K, alpha)
+  
+  #Run SNF
+  data.views$W <- SNF(Wall = data.views, K = K, t = iter)
+  
+  #Cluster
+  group = spectralClustering(W, C);
+  group.1 = spectralClustering(W1, C);
+  group.2 = spectralClustering(W2, C);
+  
+  #"Clustering results of individual and fused data views"
+  SNFNMI = calNMI(group, truelabel)
+  SNFNMI.1 = calNMI(group.1, truelabel)
+  SNFNMI.2 = calNMI(group.2, truelabel)
+  
+  return(list(affinity.matrices = list(W1 = W1, W2 = W2, W = W),
+              nmi.values = list(nmi.1 = SNFNMI.1, nmi.2 = SNFNMI.2, nmi.fused = SNFNMI),
+              identity = list(ident.1 = group.1, ident.2 = group.2, ident.fused = group)))
+}
+
+
+
+
 processSNFData <- function(dat1, dat2, label){
   
   data.modalities <- list()

@@ -9,13 +9,15 @@ runMKKMPipeline <- function(data.views, truelabel,
 
   #Requirements  
   require(abind)
+  require(SNFtool)#for preprocessing of the data
   require(MKKC)
   require(rlist)
   require(clValid)
   require(psych)
   
-  #Process the data set
-  data.views <- preProcessData(data.views)
+  #Process the data set -- in progress
+  #data.views <- preProcessData(data.views)
+  Data1
   
   
   #Calculate kernel/similarity matrices  --kernel parameter optimization --- 

@@ -3,15 +3,15 @@ chooseDataType <- function(disease){
   #TODO ENTER BASE STRING AS PARAMETER
   
   if(disease == "GBM"){
-    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/GBM/", full.names = TRUE)
+    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/GBM", full.names = TRUE)
   }else if(disease == "BREAST"){
-    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Breast/", full.names = TRUE)
+    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Breast", full.names = TRUE)
   }else if(disease == "COLON"){
-    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Colon/", full.names = TRUE)
+    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Colon", full.names = TRUE)
   }else if (disease == "KIDNEY"){
-    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Kidney/", full.names = TRUE)
+    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Kidney", full.names = TRUE)
   }else if(disease == "LUNG"){
-    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Lung/", full.names = TRUE)
+    data.files <- list.files("~/Documents/gitRepos/master/data/SNF/Lung", full.names = TRUE)
   }else{
     print("data for specified disease does not exist")
   }
