@@ -1,80 +1,52 @@
 #The Multiple kernel k means pipeline for simulated data
-runMKKMPipeline <- function(data.views, truelabel,
-                            K = 20, alpha = 0.5, iter = 10,
-                            down.pct = 1, C = 2,
-                            simulation = FALSE,
-                            kernel.normalization = TRUE,
-                            choose.variable.genes = FALSE,
-                            prcomp = TRUE,
+runMKKMPipeline <- function(Data1, Data2, truelabel,
+                            C = 2,
+                            scale.factor = 1/20,
                             kernel = "nn"){
   
   #Requirements  
-  require(abind)
   require(SNFtool)#for preprocessing of the data
   require(MKKC)
-  require(rlist)
-  require(clValid)
-  require(psych)
+
+  Data1 <- Data1[, c("V1", "V2")]
+  Data2 <- Data2[, c("V1", "V2")]
+  data.views <- list(Data1, Data2)
   
   #Process the data set
-  data.views <- lapply(data.views, FUN = function(view){t(as.matrix(view))})
+  data.views <- lapply(data.views, FUN = function(view){as.matrix(view)})
   
   #Normalization
   data.views <- lapply(data.views, FUN = standardNormalization)
   
+  #Create kernels for each data view
+  data.features <- makeKernels1(data.views = data.views, scale.factor)#Make kernels
+  data.features <- lapply(data.features, FUN = function(data.feature){StandardizeKernel(x = data.feature)}) #Standardize
   
-  #Calculate kernel/similarity matrices  --kernel parameter optimization --- 
-  #standardize matrices for comparison --- transform into a matrix array
-  #kernels <- lapply(c(1:length(data.views)), FUN = function(idx){chooseKernel(data.views[[idx]])}) -- Jaccard Kernel function
-  kernels <- lapply(c(1:length(data.views)), FUN = function(idx){optimizeRBFKernel(data.views[[idx]])})#Optimized Kernels based on KSdist
-  #kernels <- lapply(c(1:length(kernels)), FUN = function(idx){StandardizeKernel(kernels[[idx]])}) -- don't do normalization???
-  kernel.array <- do.call(abind, c(kernels, list(along = 3)))
+  K1 <- data.features[[1]]
+  K2 <- data.features[[2]]
   
-  mkkm.model <- parallel::mclapply(c(2:50), FUN = function(k){runMKKM(kernel.array, clusters = k)})
+  n.view = length(data.features)    # the number of views used
   
-  combined.kernels <- lapply(mkkm.model, FUN = function(model){model$combined.kernel})
-  model.clustering <- lapply(mkkm.model, FUN = function(model){model$state$clustering})
-  model.kernel.coefficients <- lapply(mkkm.model, FUN = function(model){model$state$theta})
+  K.array = array(as.numeric(unlist(data.features)), dim = c(nrow(data.features[[1]]), ncol(data.features[[1]]), n.view))
   
-  #Normalized mutual information for when we know the labels
-  mkkc.nmi <- lapply(model.clustering, FUN = function(clustering){NormMI(truelabel, model.clustering)})
+  #res <- mkkc(K = K, centers = 2)
+  model <- runMKKM(kernel.array = K.array)
+  K <- model$combined.kernel
   
-  #Internal measures for when we do not know the true labels...
-  #calculate distances
+  #Cluster
+  group = model$state$clustering
+  group.1 = runkkmeans(K1, C)
+  group.2 = runkkmeans(K2, C)
   
-  data.views.dr <- lapply(data.views, FUN = function(data.view){prcomp(t(data.view), rank. = 100)$x})
+  #"Clustering results of individual and fused data views"
+  mkkmNMI = calNMI(group, truelabel)
+  mkkmNMI.1 = calNMI(group.1$clustering, truelabel)
+  mkkmNMI.2 = calNMI(group.2$clustering, truelabel)
   
-  if(dist.type = "cor"){
-    
-    dists <- lapply(data.views, function(data.view){as.dist((1 - cor(data.view))/2)})
-    
-  }else{
-    dists <- lapply(data.views.dr, FUN = function(data.view){dist(data.view, method = dist.type)})
-  }
-  
-  quality.metrics <- lapply(dists, calcInternalClusterQualityMeasures, mkkm.model)
-  
-  plotInternalQulaitymetrics()
 
-  #Feature/cluster id mutual information based cluster number optimization
-
-  #PC based
-  average.cluster.mi <- lapply(data.views.dr, FUN = function(data.view){chooseClustersMI(data.view, model.clustering)})
-
-  #Gene based ------
-  features.use <- lapply(data.views, FUN = function(data.view){chooseVariableFeatures(data.view)})
-  average.cluster.mi <- lapply(data.views, FUN = function(data.view){chooseClustersMI(data.view, model.clustering, features.use)})
-  
-  
-  
-  
-  #Choose the optimal clustering parameter setting based on dunn index and return relevant 
-  
-  which.min(quality.metrics[])
-
-  return(list(affinity.matrices = list(W1 = W1, W2 = W2, W = W),
-              nmi.values = list(nmi.1 = SNFNMI.1, nmi.2 = SNFNMI.2, nmi.fused = SNFNMI),
-              identity = list(ident.1 = group.1, ident.2 = group.2, ident.fused = group)))
+  return(list(kernel.matrices = list(K1 = K1, K2 = K2, K = model$combined.kernel),
+              nmi.values = list(nmi.1 = mkkmNMI.1, nmi.2 = mkkmNMI.2, nmi.fused = mkkmNMI),
+              identity = list(ident.1 = group.1$clustering, ident.2 = group.2$clustering, ident.fused = group)))
 
 }
 ##############################################################################################################33333
@@ -125,36 +97,8 @@ calcInternalClusterQualityMeasures <- function(experimental.dist, models){
   
   return(quality.metrics)
 }
-##############################################################################################################
 
-##############################################################################################################
-preProcessData <- function(data.views, simulation, choose.variable.genes, prcomp){
-  #Process the data set
-  if(simulation){
-    data.views <- lapply(c(1:length(data.views)), FUN = function(idx){as.matrix(data.views[[idx]][, c("V1", "V2")])})
-    data.views <- lapply(c(length(data.views)), FUN = function(idx){t(data.views[[idx]])})
-  }else{
-    data.views <- lapply(c(1:length(data.views)), FUN = function(idx){as.matrix(data.views[[idx]])})
-  }
-  
-  #Normalization section
-  #Sample normalization to control for absolute size differences (ie num transcripts detected) between samples -- only for positive count data
-  if(sample.normalize){
-    data.views <- lapply(c(1:length(data.views)), FUN = function(idx){data.views[[idx]] / colSums(data.views[[idx]])})
-  }
-  
-  
-  #Choose variable genes -- TODO
-  if(choose.variable.genes){
-    data.views <- lapply(data.views, FUN = 
-                         )
-  
-  
-  #Principal components - DR
-  
-  if(prcomp){TODO principal components analysis}
-  
-}
+
   ##############################################################################################################
 runMKKM <- function(kernel.array, clusters = 2, iter = 10){
   #source(fxn.location)
@@ -170,7 +114,7 @@ runMKKM <- function(kernel.array, clusters = 2, iter = 10){
   parameters$iteration_count <- iter
   model$state <- mkkmeans_train(kernel.array, parameters)
   ###########################################################################################
-  model$combined.kernel <- combineKernels(kernel.array, state$theta)
+  model$combined.kernel <- combineKernels(kernel.array, model$state$theta)
   
   return(model)
   
@@ -229,6 +173,34 @@ mkkmeans_train <- function(Km, parameters) {
   return(state)
 }
 
+runkkmeans <- function(K, C){
+  #initalize the parameters of the algorithm
+  parameters <- list()
+  
+  #set the number of clusters
+  parameters$cluster_count <- C
+  
+  #perform training
+  state <- kkmeans_train(K, parameters)
+  
+  return(state)
+}
+
+kkmeans_train <- function(K, parameters) {
+  state <- list()
+  state$time <- system.time({
+    H <- eigen(K, symmetric = TRUE)$vectors[, 1:parameters$cluster_count]
+    objective <- sum(diag(t(H) %*% K %*% H)) - sum(diag(K))
+    H_normalized <- H / matrix(sqrt(rowSums(H^2, 2)), nrow(H), parameters$cluster_count, byrow = FALSE)
+    
+    set.seed(NULL)
+    state$clustering <- kmeans(H_normalized, centers = parameters$cluster_count, iter.max = 1000, nstart = 10)$cluster
+    state$objective <- objective
+    state$parameters <- parameters
+  })    
+  return(state)
+}
+
 ##############################################################################################################
 chooseKernel <- function(data.view, type = "nn", k = 30){
   require(vegan)
@@ -241,46 +213,20 @@ chooseKernel <- function(data.view, type = "nn", k = 30){
   }
 }
 
-##############################################################################################################
-optimizeRBFKernel <- function(data.view){
-  require(kernlab)
-  require(parallel)
-  require(FNN)
-  
-  param.choices.log <- c(1 * 10^(-8:3))
-  kernels.log <- lapply(param.choices.log, FUN = rbfdot)
-  
-  log.features <- mclapply(kernels.log,
-                           FUN = function(kernel){computeKernelMatrix(data.view, kernelFunction = kernel)},
-                           mc.cores = (detectCores()-1))
-  
-  #Choose best kernel parameter based on KL divergence...resultoing distribution of values in kernel should be close to beta distribution
-  #Centered around 0.5, with values between 0 and 1 (symmetric)
-  
- test.results <- lapply(log.features, FUN = computeKSDist)
- min.idx <- which.min(test.results)
- 
- #Test different parameter values on a linear scale based on the "optimal" value from above
- param.choices.linear <- unlist(lapply(param.choices.log[c((min.idx -1) : (min.idx + 1))],
-                                         FUN = function(scale.value){scale.value * seq(1,10, 2)}))
- kernels.linear <- lapply(param.choices.linear, FUN = rbfdot)
- linear.features <- mclapply(kernels.linear,
-                             FUN = function(kernel){computeKernelMatrix(data.view, kernelFunction = kernel)},
-                             mc.cores = (detectCores()-1))
- #Calculate distances again
- test.results <- lapply(linear.features, FUN = computeKSDist)
- min.idx <- which.min(test.results)
- 
- return(linear.features[[min.idx]])
- 
-}
+
+
 
 ##############################################################################################################
-computeKSDist <- function(kern){
-  test.result <- suppressWarnings(ks.test(x = c(kern), y = rbeta(length(kern), shape1 = 2, shape2 = 2)))
-  return(test.result[["statistic"]])
+makeKernels1 <- function(data.views, scale.factor = 1){
+  require(kernlab)
+  require(parallel)
+  kernel.functions <- lapply(data.views, FUN = function(data.view){rbfdot(sigma = (scale.factor * sqrt(nrow(data.view))))})
+  data.features <- lapply(c(1:length(kernel.functions)),
+                          FUN = function(idx){kernelMatrix(x = data.views[[idx]],
+                                                           kernel = kernel.functions[[idx]])})
+  return(data.features)
 }
-##############################################################################################################
+
 computeKernelMatrix <- function(data, kernelFunction){
   
   kernel <- matrix( ,nrow = ncol(data), ncol = ncol(data))
