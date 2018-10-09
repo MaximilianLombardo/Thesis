@@ -1,6 +1,12 @@
 ############################################################################################################################################3
 #Plotting functions
 
+plotSilhouette <- function(sil, ncol = 100){
+  #plot(sil, main = "Silhouette plot of data view")
+  plot(sil, main = "Silhouette plot of data view", col = rainbow(ncol, s = 0.5), cex = 0.75)
+}
+
+
 plotInternalQulaitymetrics <- function(quality.metrics, data.views.names){
   require(cowplot)
   
@@ -51,19 +57,6 @@ plotSNFHeatComparison <- function(all.data, truelabel, down.pct = 1){
   ## These similarity graphs have complementary information about clusters.
   new.palette=colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
   
-  #Display Data View 1
-  #displayClusters(W1,truelabel, main.title = "Data View 1",
-  #                col = rev(new.palette(100)))
-  #Display Data View 2
-  #displayClusters(W2,truelabel, main.title = "Data View 2",
-  #                col = rev(new.palette(100)))
-  #Display fused kernel
-  #displayClusters(W, truelabel, main.title = "Fused Data View",
-  #                col = rev(new.palette(100)))
-  #Display average kernel
-  #displayClusters((W1 + W2)/2, truelabel, main.title = "Average Data View",
-  #                col = rev(new.palette(100)))
-  
   #Downsample points for big display
   samp.vec = c(1:nrow(W1))
   num.to.sample = floor(down.pct * nrow(W1))
@@ -75,26 +68,26 @@ plotSNFHeatComparison <- function(all.data, truelabel, down.pct = 1){
                   col = rev(new.palette(100)))
   displayClusters(W[ind,ind], truelabel[ind], main.title = "Fused Data Views",
                   col = rev(new.palette(100)))
+}
 
-
-  #Save old/default graphics parameters
-  #old.par <- par(mar = c(1, 1, 1, 1),
-  #               oma = c(10,0,10,0),
-  #               mfrow = c(1,1))
+plotSNFHeatComparison2 <- function(all.data, true.labels, down.pct = 1){
+  require(RColorBrewer)
   
-  #3 by 1 plot for figures
-  #plot.new()
-  #par(mfrow = c(1,3), oma = c(10,0,10,0))
-  #displayClusters(W1[ind,ind], truelabel[ind], main.title = "Data View 1",
-  #                col = rev(new.palette(100)))
-  #displayClusters(W2[ind,ind], truelabel[ind], main.title = "Data View 2",
-  #                col = rev(new.palette(100)))
-  #displayClusters(W[ind,ind], truelabel[ind], main.title = "Fused Data Views",
-  #                col = rev(new.palette(100)))
-  #title(main = list("Effect of Data fusion on Simulated Data", cex = 2), outer=TRUE)
-  #
-  ##Restore old graphics parameters
-  #par(old.par)
+  ## These similarity graphs have complementary information about clusters.
+  new.palette=colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
+  
+  #Downsample points for big display
+  demo.matrix <- all.data[[1]]
+  samp.vec = c(1:nrow(demo.matrix))
+  num.to.sample = floor(down.pct * nrow(demo.matrix))
+  ind = sort(sample(samp.vec, num.to.sample))
+  
+  
+  lapply(names(all.data),
+         FUN = function(data.name){displayClusters(W = all.data[[data.name]][ind,ind],
+                                                   group = true.labels[[data.name]][ind],
+                                                   main.title = data.name,
+                                                   col = rev(new.palette(100)))})
 }
 
 ###Not Needed???
