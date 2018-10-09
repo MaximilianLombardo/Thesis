@@ -40,7 +40,7 @@ runSNFPipeline <- function(Data1, Data2, truelabel,
 }
 
 
-runSNFPipeline2 <- function(disease = "GBM", truelabel = NULL,
+runSNFPipeline2 <- function(disease = "GBM", opt.iter, truelabel = NULL,
                            K = 20, alpha = 0.5, iter = 10,
                            down.pct = 1, C = 2){
   require(SNFtool)
@@ -66,30 +66,15 @@ runSNFPipeline2 <- function(disease = "GBM", truelabel = NULL,
   data.views <- lapply(data.views, FUN = standardNormalization)
   #########
   #Random Search hyperparameter optimization
-  optimized.params <- randomSearchParams(data.views = data.views, search.iterations = 100)
-  
-  ########
-  #HyperParameter Optimization
-  #optimized.hyper.params <- BayesianOptimization(FUN = maximizeSilhouetteSNF,
-  #                                               bounds = list(K = c(1L,20L), alpha = c(0.1,2.0),
-  #                                                             iter = c(10L, 10L), C = c(2L,10L),
-  #                                                             num.pcs = c(5L, 60L)),
-  #                                               init_points = 5, acq = "ei", n_iter = 215,
-  #                                               eps = 2)
-  
-  #########
+  optimized.params <- randomSearchParams(data.views = data.views, search.iterations = opt.iter)
   
   K <- optimized.params$model.params$K
   alpha <- optimized.params$model.params$alpha
   iter <- optimized.params$model.params$iter
   C <- optimized.params$model.params$C
-  num.pcs <- optimized.params$model.params$num.pcs
-  
-  #PCA
-  data.views.pca <- lapply(data.views, FUN = function(view){prcomp(t(view), rank. = num.pcs)$rotation})
-  
+
   #Calculate distance
-  data.views.dist <- lapply(data.views.pca, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
+  data.views.dist <- lapply(data.views, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
   
   ## next, construct similarity graphs
   graph.views <- lapply(data.views.dist, FUN = affinityMatrix, K, alpha)#This One
@@ -118,20 +103,14 @@ runSNFPipeline2 <- function(disease = "GBM", truelabel = NULL,
   
   return(list(affinity.matrices = graph.views,
               silhouette.values = list(single.view = sils.single.views, multi.view = sil.multiview),
-              identity = groupings))
+              identity = groupings, optimized.params = optimized.params))
 }
 
 
-####
-
-K = c(1L,20L), alpha = c(0.1,2.0),
-iter = c(10L, 10L), C = c(2L,10L),
-num.pcs = c(5L, 60L)
-####
 
 randomSearchParams <- function(data.views,search.iterations,
                                K.range = c(2:10), alpha.range = c(0.1, 5.0),
-                               iter.range = 10, C.range = c(2:10), pcs.range = c(5:60)){
+                               iter.range = 10, C.range = c(2:10), num.pcs = 100){
   params <- list()
   params$best.score <- numeric(0)
   
@@ -140,16 +119,17 @@ randomSearchParams <- function(data.views,search.iterations,
   while(i < search.iterations){
     print(i)
     #Sample new set of params
-    K <- sample(x = K.range, size = 1)
+    #K <- sample(x = K.range, size = 1)
+    K = 3
     alpha = runif(n =1, min = alpha.range[1], max = alpha.range[2])
     iter = iter.range
     C <- sample(x = C.range, size = 1)
-    num.pcs <- sample(x = pcs.range, size = 1)
     
-    model.res <- maximizeSilhouetteSNF(data.views = data.views,
+    print(list(K = K, alpha = alpha, iter = iter, C = C))
+    
+    model.res <- try(maximizeSilhouetteSNF(data.views = data.views,
                                        K = K, alpha = alpha,
-                                       iter = iter, C = C,
-                                       num.pcs = num.pcs)
+                                       iter = iter, C = C))
     if(i == 1){
       #On first iterations
       params$best.score <- model.res$Score
@@ -158,7 +138,7 @@ randomSearchParams <- function(data.views,search.iterations,
                                   num.pcs = num.pcs)
     }else{
       #The rest of the iters
-      if(model.res$Score > params$best.score){
+      if(model.res$Score > params$best.score & is.list(model.res)){
         params$best.score <- model.res$Score
         params$model.params <- list(K = K, alpha = alpha,
                                     iter = iter, C = C,
@@ -172,17 +152,85 @@ randomSearchParams <- function(data.views,search.iterations,
   
 }
 
-maximizeSilhouetteSNF <- function(data.views, K, alpha, iter, C, num.pcs){
+maximizeSNFGBM <- function(K, alpha, iter, C){
+  #require(caret)
+  #require(rpart)
+  
+  model.results <- list()
+  #LoadData
+  data.views <- chooseDataType(disease)
+  #Separate survival data file path
+  survival <- data.views[4]
+  #Read in data views and survival
+  data.views <- lapply(data.views[1:3], FUN = read.table)
+  names(data.views) <- c("ge", "meth", "mirna")
+  
+  survival <- read.table(survival, header = TRUE)
+  
+  #Process the data set
+  data.views <- lapply(data.views, FUN = function(view){t(as.matrix(view))})
+  
+  #Normalization
+  data.views <- lapply(data.views, FUN = standardNormalization)
+  
+  #PCA
+  #data.views.pca <- lapply(data.views, FUN = function(view){prcomp(t(view), rank. = num.pcs)$rotation})
+  
+  #Calculate distance
+  data.views.dist <- lapply(data.views, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
+  
+  ## next, construct similarity graphs
+  graph.views <- lapply(data.views.dist, FUN = affinityMatrix, K, alpha)#This One
+  
+  #Run SNF
+  graph.views$W_fused <- try(SNF(Wall = graph.views, K = K, t = iter))#This One
+  
+  #Cluster
+  groupings = lapply(graph.views, FUN = function(graph.view){spectralClustering(graph.view, C)})#This one
+  
+  #Cast the previously calculated distance matrics to type dist
+  data.views.dist <- lapply(data.views.dist, FUN = function(view.dist){as.dist(view.dist)})
+  
+  #Calculate silhouette scores...
+  #Matching up single data views with respectively defined clusterings
+  sils.single.views <- lapply(names(data.views),
+                              FUN = function(idx){silhouette(x = groupings[[idx]],
+                                                             dist = data.views.dist[[idx]])})
+  names(sils.single.views) <- names(data.views)
+  
+  sil.multiview <- lapply(data.views.dist,
+                          FUN = function(data.view.dist){silhouette(x = groupings$W_fused,
+                                                                    dist = data.view.dist)})
+  
+  #Cast the previously calculated distance matrics to type dist
+  data.views.dist <- lapply(data.views.dist, FUN = function(view.dist){as.dist(view.dist)})
+  
+  #Calculate silhouette scores...
+  #Matching up single data views with respectively defined clusterings
+  sils.single.views <- lapply(names(data.views),
+                              FUN = function(idx){silhouette(x = groupings[[idx]],
+                                                             dist = data.views.dist[[idx]])})
+  names(sils.single.views) <- names(data.views)
+  
+  sil.multiview <- lapply(data.views.dist,
+                          FUN = function(data.view.dist){silhouette(x = groupings$W_fused,
+                                                                    dist = data.view.dist)})
+  avg.sils <- lapply(sil.multiview, FUN = function(sil.score){mean(sil.score[,"sil_width"])})
+  
+  model.results$Score <- mean(unlist(avg.sils))
+  model.results$Pred <- 0#groupings$W_fused
+  
+  return(model.results)
+}
+
+maximizeSilhouetteSNF <- function(data.views, K, alpha, iter, C){
   #require(caret)
   #require(rpart)
   
   model.results <- list()
   
-  #PCA
-  data.views.pca <- lapply(data.views, FUN = function(view){prcomp(t(view), rank. = num.pcs)$rotation})
-  
   #Calculate distance
-  data.views.dist <- lapply(data.views.pca, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
+  data.views.dist <- lapply(data.views, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
   
   ## next, construct similarity graphs
   graph.views <- lapply(data.views.dist, FUN = affinityMatrix, K, alpha)#This One

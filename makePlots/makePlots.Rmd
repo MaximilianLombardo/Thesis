@@ -13,17 +13,17 @@ knitr::opts_chunk$set(echo = TRUE)
 #Making figures using simulated data
 #Make sure to have local version of SNFTool installed
 #Load utility functions
-#util.fxns <- "~/Documents/uva/master/the/utils/simMVData.R" 
-util.fxns <- "~/Documents/gitRepos/master/utils/simMVData.R"
+util.fxns <- "~/Documents/uva/master/the/utils/simMVData.R" 
+#util.fxns <- "~/Documents/gitRepos/master/utils/simMVData.R"
 source(util.fxns)
 
 
-#snf.fxns <- "~/Documents/uva/master/the/utils/snf_fxns.R"
-snf.fxns <- "~/Documents/gitRepos/master/utils/snf_fxns.R"
+snf.fxns <- "~/Documents/uva/master/the/utils/snf_fxns.R"
+#snf.fxns <- "~/Documents/gitRepos/master/utils/snf_fxns.R"
 source(snf.fxns)
 
-#plotting.fxns <- "~/Documents/uva/master/the/utils/plotting_fxns.R"
-plotting.fxns <- "~/Documents/gitRepos/master/utils/plotting_fxns.R"
+plotting.fxns <- "~/Documents/uva/master/the/utils/plotting_fxns.R"
+#plotting.fxns <- "~/Documents/gitRepos/master/utils/plotting_fxns.R"
 source(plotting.fxns)
 
 ###Clean up this particular set of functions, redundant
@@ -196,11 +196,12 @@ ggplot(nmi.data, aes(fill = Views, y = NMI.values, x = Simulated.Data)) +
 #snf.gbm <- suppressWarnings(expr = runSNFPipeline2(disease = "GBM", K = 4, down.pct = 0.5))
 
 
-snf.gbm <- runSNFPipeline2(disease = "GBM")
+snf.gbm <- runSNFPipeline2(disease = "GBM", opt.iter = 500)
 
 #Make some silhouette plots
 plot(snf.gbm$silhouette.values$single.view$ge,
-     col = rainbow(3, s = 0.8), cex = 0.8,
+     col = rainbow(2, s = 0.8),
+     cex = 0.8,
      main = "Silhouette plot of Data View",
      nmax.lab = 60, max.strlen = 5,
      do.n.k = FALSE, do.clus.stat = TRUE)
