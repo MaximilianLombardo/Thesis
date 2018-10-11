@@ -1,6 +1,69 @@
 ############################################################################################################################################3
 #Plotting functions
+####################################
 
+plotFeatureHeatMap <- function(data.view, features, ident){
+  require(d3heatmap)
+  ind <- order(ident)
+  d3heatmap(x = t(data.view[ind, features]),
+            Rowv = FALSE, Colv = FALSE,
+            colors = "Blues",
+            labCol = NULL)
+}
+
+plotClustersDRSpace <- function(fused.view,
+                                group.prediction,
+                                reduction.use = "pca",
+                                main.title = "Dimensionality Reduction"){
+  require(ggplot2)
+  require(Rtsne)
+  
+  if(reduction.use == "pca"){
+    view.pca <- prcomp(x = fused.view, rank. = 2)$rotation
+    view.pca <- cbind(view.pca, group.prediction)
+    
+  
+    plt <- ggplot(data.frame(view.pca),
+                  aes(x = PC1, y = PC2, color = factor(group.prediction))) + geom_point() 
+    plt + ggtitle(main.title) + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "Predicted Identity")
+  }else{
+    view.tsne <- Rtsne(X = fused.view, perplexity = 75, theta = 0.1, pca = FALSE)$Y
+    colnames(view.tsne) <- c("tSNE1", "tSNE2")
+    view.tsne <- cbind(view.tsne, group.prediction)
+    plt <- ggplot(data.frame(view.tsne),
+                  aes(x = tSNE1, y = tSNE2, color = factor(group.prediction))) + geom_point() 
+    plt + ggtitle(main.title) + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "Predicted Identity")
+  }
+  
+  
+  
+}
+
+
+#Plot survival curves
+ plotSurvivalCurves <- function(disease, group.prediction){
+   require(survminer)
+   require(survival)
+   
+   #Load up the appropriate disease data views file paths
+   data.views <- chooseDataType(disease)
+   #Separate survival data file path
+   survival <- data.views[4]
+   survival <- read.table(survival, header = TRUE)
+   rm(data.views)
+   
+   survival <- cbind(survival, group.prediction)
+   
+   
+   fit <- survfit(Surv(Survival, Death) ~ group.prediction, data = survival)
+   
+   ggsurvplot(fit, data = survival,
+              risk.table = FALSE, conf.int = FALSE)
+ }
+ 
+
+
+###################################
 plotSilhouette <- function(sil, ncol = 100){
   #plot(sil, main = "Silhouette plot of data view")
   plot(sil, main = "Silhouette plot of data view", col = rainbow(ncol, s = 0.5), cex = 0.75)

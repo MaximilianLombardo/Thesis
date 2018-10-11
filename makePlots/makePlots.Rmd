@@ -13,17 +13,17 @@ knitr::opts_chunk$set(echo = TRUE)
 #Making figures using simulated data
 #Make sure to have local version of SNFTool installed
 #Load utility functions
-util.fxns <- "~/Documents/uva/master/the/utils/simMVData.R" 
-#util.fxns <- "~/Documents/gitRepos/master/utils/simMVData.R"
+#util.fxns <- "~/Documents/uva/master/the/utils/simMVData.R" 
+util.fxns <- "~/Documents/gitRepos/master/utils/simMVData.R"
 source(util.fxns)
 
 
-snf.fxns <- "~/Documents/uva/master/the/utils/snf_fxns.R"
-#snf.fxns <- "~/Documents/gitRepos/master/utils/snf_fxns.R"
+#snf.fxns <- "~/Documents/uva/master/the/utils/snf_fxns.R"
+snf.fxns <- "~/Documents/gitRepos/master/utils/snf_fxns.R"
 source(snf.fxns)
 
-plotting.fxns <- "~/Documents/uva/master/the/utils/plotting_fxns.R"
-#plotting.fxns <- "~/Documents/gitRepos/master/utils/plotting_fxns.R"
+#plotting.fxns <- "~/Documents/uva/master/the/utils/plotting_fxns.R"
+plotting.fxns <- "~/Documents/gitRepos/master/utils/plotting_fxns.R"
 source(plotting.fxns)
 
 ###Clean up this particular set of functions, redundant
@@ -35,14 +35,6 @@ source(plotting.fxns)
 #Load Simulated Data from Similarity Network Fusion
 library(SNFtool)
 
-
-#Data and Labels for simulated scenario A -- from SNFtool pacakge
-#data("Data1")#Loads Data1
-#data("Data2")#Loads Data2
-
-#labels <- c(matrix(1,100,1),matrix(2,100,1))
-
-#inverted.sim <- processSNFData(Data1, Data2, labels)
 
 
 #Data and Labels for simulated scenario B
@@ -57,15 +49,6 @@ perturb.sim <- simulatePerturbationData(num = 1000, pct.switch = 0.2)
 ```{r}
 #Chapter 4 Figures
 #Figure 1 Individual Simulated Data Scatter Views
-
-#Scenario A - Inverted Labels - variable class definition
-#plotSimDataScatter(dat = inverted.sim$classes[,c("V1", "V2")],
-#                   lab = inverted.sim$classes[,c("label")],
-#                   main.title =  "View 1 Classfication")
-#plotSimDataScatter(dat = inverted.sim$inverted.classes[,c("V1", "V2")],
-#                   lab = inverted.sim$inverted.classes[,c("label")],
-#                   main.title =  "View 2 Inverted Classification")
-
 
 #Add more types of noise to this figure and get rid of second portion?
 #Scenario B Gaussian and Gamma Noise added to ground truth
@@ -98,12 +81,6 @@ plotSimDataScatter(dat = perturb.sim$perturbation.2[,c("V1", "V2")],
 #Chapter 4 Figures
 #Figure 2 Similarity Network Fusion Heat Comparison
 #Scenario A - inverted labels
-
-#snf.a <- runSNFPipeline(Data1 = inverted.sim$classes,
-#                        Data2 = inverted.sim$inverted.classes,
-#                        truelabel = inverted.sim$true.label)
-#a.nmi <- plotSNFHeatComparison(all.data = snf.a$affinity.matrices,
-#                               truelabel = inverted.sim$true.label)
 
 #Scenario B - Noisy views
 snf.b <- runSNFPipeline(Data1 = noise.sim$gaussian.noise,
@@ -192,21 +169,53 @@ ggplot(nmi.data, aes(fill = Views, y = NMI.values, x = Simulated.Data)) +
 
 ```{r}
 #Run SNF pipeline on GBM data (also with breast, kidney, liver...) from paper
-#Wrap up supressWarnings function later
-#snf.gbm <- suppressWarnings(expr = runSNFPipeline2(disease = "GBM", K = 4, down.pct = 0.5))
 
+snf.gbm <- processRealData(disease = "GBM")
+#Manual parameters
+C <-5
+snf.gbm <- runSNFPipelineRealData(disease = "GBM", K = 10, C = C, num.pcs = 15, alpha = 0.3)
 
-snf.gbm <- runSNFPipeline2(disease = "GBM", opt.iter = 500)
-
-#Make some silhouette plots
+#Make some silhouette plots - Single Data View predictions against single data view distances package these silhouette plots up!
 plot(snf.gbm$silhouette.values$single.view$ge,
-     col = rainbow(2, s = 0.8),
+     col = rainbow(C, s = 0.8),
      cex = 0.8,
-     main = "Silhouette plot of Data View",
+     main = "Silhouette plot: Gene Expression View",
+     nmax.lab = 60, max.strlen = 5,
+     do.n.k = FALSE, do.clus.stat = TRUE)
+plot(snf.gbm$silhouette.values$single.view$meth,
+     col = rainbow(C, s = 0.8),
+     cex = 0.8,
+     main = "Silhouette plot: Methylation View",
+     nmax.lab = 60, max.strlen = 5,
+     do.n.k = FALSE, do.clus.stat = TRUE)
+plot(snf.gbm$silhouette.values$single.view$mirna,
+     col = rainbow(C, s = 0.8),
+     cex = 0.8,
+     main = "Silhouette plot: miRNA View",
      nmax.lab = 60, max.strlen = 5,
      do.n.k = FALSE, do.clus.stat = TRUE)
 
+#More silhouette Plots - Fused Data View predictions against single data view distances --- 
+plot(snf.gbm$silhouette.values$multi.view$ge,
+     col = rainbow(C, s = 0.8),
+     cex = 0.8,
+     main = "Silhouette plot: Gene Expression View",
+     nmax.lab = 60, max.strlen = 5,
+     do.n.k = FALSE, do.clus.stat = TRUE)
 
+plot(snf.gbm$silhouette.values$multi.view$meth,
+     col = rainbow(C, s = 0.8),
+     cex = 0.8,
+     main = "Silhouette plot: Methylation View",
+     nmax.lab = 60, max.strlen = 5,
+     do.n.k = FALSE, do.clus.stat = TRUE)
+
+plot(snf.gbm$silhouette.values$multi.view$mirna,
+     col = rainbow(C, s = 0.8),
+     cex = 0.8,
+     main = "Silhouette plot: mirna View",
+     nmax.lab = 60, max.strlen = 5,
+     do.n.k = FALSE, do.clus.stat = TRUE)
 
 ## S3 method for class 'silhouette'
 #plot(x, nmax.lab = 40, max.strlen = 5,
@@ -222,6 +231,45 @@ plot(snf.gbm$silhouette.values$single.view$ge,
 plotSNFHeatComparison2(all.data = snf.gbm$affinity.matrices,
                       true.labels = snf.gbm$identity,
                       down.pct = 1)
+######################################################################################################
+#Do the same for MKKM pipeline @TODO
+
+```
+
+
+```{r}
+#Take the predictions that ar made from the SNF pipeline and construct survival curves from the fused predictions
+
+#Plotting the survival curves for all GBM patients, grouped by predicitions made from the Similarity Network Fusion approach vs groupings for single dataviews??
+#Survival curves of individual view predictions and fused predictions
+plotSurvivalCurves(disease = "GBM",
+                   group.prediction = snf.gbm$identity$ge)
+plotSurvivalCurves(disease = "GBM",
+                   group.prediction = snf.gbm$identity$meth)
+plotSurvivalCurves(disease = "GBM",
+                   group.prediction = snf.gbm$identity$mirna)
+plotSurvivalCurves(disease = "GBM",
+                   group.prediction = snf.gbm$identity$W_fused)
+
+#Plot the cluster layout using a pca based or tsne based coordinate system...
+#Quality of other data views?
+
+plotClustersDRSpace(fused.view = snf.gbm$affinity.matrices$W_fused,
+                    group.prediction = snf.gbm$affinity.matrices$W_fused,
+                    reduction.use = "pca", main.title = "PCA reduction of fused Matrix")
+
+#Discriminative features using the Similarity Network Fusion cluster assignments
+
+disc.features <- discriminativeFeatureSelection(data.views, snf.gbm$identity$W_fused)
+
+plotFeatureHeatMap(data.view = , features = names(disc.features$ge[1:100]))#Might need a better way to choose features
+#Plotting the survival curves for all GBM patients, grouped by predicitions made from the Multiple Kernel K-Means method
+
+#Plot dimensionality reduction of groupings/fused kernels found by multiple kernel K means...
+
+
+
+
 
 
 ```
