@@ -168,76 +168,46 @@ ggplot(nmi.data, aes(fill = Views, y = NMI.values, x = Simulated.Data)) +
 
 
 ```{r}
+#Chapter 4 unsupervised learning on real data....
 #Run SNF pipeline on GBM data (also with breast, kidney, liver...) from paper
+#Read in the Verhaaken Gene Sets
+root.dir <- "~/Documents/gitRepos/master/data/GBM_genesets/"
+gene.sets <- list()
+gene.sets$classical <- read.table(paste0(root.dir, "geneset_classical.txt"), stringsAsFactors = FALSE)$V1
+gene.sets$mesenchymal <- read.table(paste0(root.dir, "geneset_mesenchymal.txt"), stringsAsFactors = FALSE)$V1
+gene.sets$neural <- read.table(paste0(root.dir, "geneset_neural.txt"), stringsAsFactors = FALSE)$V1
+gene.sets$proneural <- read.table(paste0(root.dir, "geneset_proneural.txt"), stringsAsFactors = FALSE)$V1
 
-snf.gbm <- processRealData(disease = "GBM")
+
+
+
+snf.gbm.data <- processRealData(disease = "GBM", genes.use = sort(unique(unlist(gene.sets))))
 #Manual parameters
-C <-5
-snf.gbm <- runSNFPipelineRealData(disease = "GBM", K = 10, C = C, num.pcs = 15, alpha = 0.3)
+C <- 4
+K <- 50
+alpha <- 0.3
+num.pcs <- 15
+snf.gbm <- runSNFPipelineRealData(object = snf.gbm.data,
+                                  K = K, C = C, alpha = alpha,
+                                  num.pcs = num.pcs)
 
 #Make some silhouette plots - Single Data View predictions against single data view distances package these silhouette plots up!
-plot(snf.gbm$silhouette.values$single.view$ge,
-     col = rainbow(C, s = 0.8),
-     cex = 0.8,
-     main = "Silhouette plot: Gene Expression View",
-     nmax.lab = 60, max.strlen = 5,
-     do.n.k = FALSE, do.clus.stat = TRUE)
-plot(snf.gbm$silhouette.values$single.view$meth,
-     col = rainbow(C, s = 0.8),
-     cex = 0.8,
-     main = "Silhouette plot: Methylation View",
-     nmax.lab = 60, max.strlen = 5,
-     do.n.k = FALSE, do.clus.stat = TRUE)
-plot(snf.gbm$silhouette.values$single.view$mirna,
-     col = rainbow(C, s = 0.8),
-     cex = 0.8,
-     main = "Silhouette plot: miRNA View",
-     nmax.lab = 60, max.strlen = 5,
-     do.n.k = FALSE, do.clus.stat = TRUE)
+plotSilhouetteSingle(snf.gbm, C)
+
 
 #More silhouette Plots - Fused Data View predictions against single data view distances --- 
-plot(snf.gbm$silhouette.values$multi.view$ge,
-     col = rainbow(C, s = 0.8),
-     cex = 0.8,
-     main = "Silhouette plot: Gene Expression View",
-     nmax.lab = 60, max.strlen = 5,
-     do.n.k = FALSE, do.clus.stat = TRUE)
 
-plot(snf.gbm$silhouette.values$multi.view$meth,
-     col = rainbow(C, s = 0.8),
-     cex = 0.8,
-     main = "Silhouette plot: Methylation View",
-     nmax.lab = 60, max.strlen = 5,
-     do.n.k = FALSE, do.clus.stat = TRUE)
+plotSilhouetteMulti(snf.gbm, C)
 
-plot(snf.gbm$silhouette.values$multi.view$mirna,
-     col = rainbow(C, s = 0.8),
-     cex = 0.8,
-     main = "Silhouette plot: mirna View",
-     nmax.lab = 60, max.strlen = 5,
-     do.n.k = FALSE, do.clus.stat = TRUE)
-
-## S3 method for class 'silhouette'
-#plot(x, nmax.lab = 40, max.strlen = 5,
-#     main = NULL, sub = NULL, xlab = expression("Silhouette width "* s[i]),
-#     col = "gray",  do.col.sort = length(col) > 1, border = 0,
-#     cex.names = par("cex.axis"), do.n.k = TRUE, do.clus.stat = TRUE, ...)
-
+#Make a silhouette plot with the average value of each point's silhouette value for each data type
+#aka plot average silhouette value for each point compare against the fused affinity matrix
 
 
 #Plot affinity matrices 
-
-
 plotSNFHeatComparison2(all.data = snf.gbm$affinity.matrices,
                       true.labels = snf.gbm$identity,
                       down.pct = 1)
-######################################################################################################
-#Do the same for MKKM pipeline @TODO
 
-```
-
-
-```{r}
 #Take the predictions that ar made from the SNF pipeline and construct survival curves from the fused predictions
 
 #Plotting the survival curves for all GBM patients, grouped by predicitions made from the Similarity Network Fusion approach vs groupings for single dataviews??
@@ -252,23 +222,60 @@ plotSurvivalCurves(disease = "GBM",
                    group.prediction = snf.gbm$identity$W_fused)
 
 #Plot the cluster layout using a pca based or tsne based coordinate system...
-#Quality of other data views?
+#Quality of other data views? -- these other data views look like absolute trash...
+plotClustersDRSpace(fused.view = t(snf.gbm.data$data.views$ge),
+                    group.prediction = snf.gbm$identity$W_fused,
+                    reduction.use = "pca", main.title = "PCA reduction of Gene Expression Matrix")
+
+
+plotClustersDRSpace(fused.view = t(snf.gbm.data$data.views$meth),
+                    group.prediction = snf.gbm$identity$W_fused,
+                    reduction.use = "pca", main.title = "PCA reduction of Meth Matrix")
+
+plotClustersDRSpace(fused.view = t(snf.gbm.data$data.views$mirna),
+                    group.prediction = snf.gbm$identity$W_fused,
+                    reduction.use = "pca", main.title = "PCA reduction of miRNA Matrix")
 
 plotClustersDRSpace(fused.view = snf.gbm$affinity.matrices$W_fused,
-                    group.prediction = snf.gbm$affinity.matrices$W_fused,
+                    group.prediction = snf.gbm$identity$W_fused,
                     reduction.use = "pca", main.title = "PCA reduction of fused Matrix")
 
 #Discriminative features using the Similarity Network Fusion cluster assignments
 
-disc.features <- discriminativeFeatureSelection(data.views, snf.gbm$identity$W_fused)
+disc.features <- discriminativeFeatureSelection(snf.gbm.data$data.views, gene.sets$classical)
 
-plotFeatureHeatMap(data.view = , features = names(disc.features$ge[1:100]))#Might need a better way to choose features
-#Plotting the survival curves for all GBM patients, grouped by predicitions made from the Multiple Kernel K-Means method
+plotFeatureHeatMap(data.view = snf.gbm.data$data.views$meth,
+                   features = colnames(snf.gbm.data$data.views$meth),
+                   ident = snf.gbm$identity$W_fused,
+                   scale = "col", all.features = TRUE)#Might need a better way to choose features
+
+#Read in the Verhaaken Gene Sets
+root.dir <- "~/Documents/gitRepos/master/data/GBM_genesets/"
+gene.sets <- list()
+gene.sets$classical <- read.table(paste0(root.dir, "geneset_classical.txt"), stringsAsFactors = FALSE)$V1
+gene.sets$mesenchymal <- read.table(paste0(root.dir, "geneset_mesenchymal.txt"), stringsAsFactors = FALSE)$V1
+gene.sets$neural <- read.table(paste0(root.dir, "geneset_neural.txt"), stringsAsFactors = FALSE)$V1
+gene.sets$proneural <- read.table(paste0(root.dir, "geneset_proneural.txt"), stringsAsFactors = FALSE)$V1
+
+
+
+
+
+######################################################################################################
+#Do the same for MKKM pipeline @TODO
+
+```
+
+
+```{r}
 
 #Plot dimensionality reduction of groupings/fused kernels found by multiple kernel K means...
 
 
-
+plotFeatureHeatMap(data.view = snf.gbm.data$data.views$ge,
+                   features = gene.sets$mesenchymal,
+                   ident = snf.gbm$identity$W_fused,
+                   scale = "col")#Might need a better way to choose features
 
 
 

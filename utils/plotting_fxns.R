@@ -2,13 +2,27 @@
 #Plotting functions
 ####################################
 
-plotFeatureHeatMap <- function(data.view, features, ident){
+plotFeatureHeatMap <- function(data.view, features, ident, scale = "col", all.features = FALSE){
   require(d3heatmap)
+  require(RColorBrewer)
+  #require(gplots)
+  
+  #features <- ifelse(test = all.features,
+  #                   yes = colnames(data.view),
+  #                   no =intersect(features, colnames(data.view)))
+  
+  features <- intersect(features, colnames(data.view))
+  
   ind <- order(ident)
-  d3heatmap(x = t(data.view[ind, features]),
-            Rowv = FALSE, Colv = FALSE,
-            colors = "Blues",
-            labCol = NULL)
+  #d3heatmap(x = t(data.view[ind, features]),
+  #          Rowv = TRUE, Colv = FALSE, scale = scale,
+  #          labCol = as.character(ident[ind]))
+  
+  new.palette <- colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
+  
+  heatmap(x = t(data.view[ind,features]),
+          Rowv = NA, Colv = NA, keep.dendro = FALSE, col=new.palette(100),labRow = as.character(ident), )
+  
 }
 
 plotClustersDRSpace <- function(fused.view,
@@ -39,6 +53,50 @@ plotClustersDRSpace <- function(fused.view,
   
 }
 
+
+plotSilhouetteSingle <- function(object, C){
+  plot(object$silhouette.values$single.view$ge,
+       col = rainbow(C, s = 0.8),
+       cex = 0.8,
+       main = "Silhouette plot: Gene Expression View",
+       nmax.lab = 60, max.strlen = 5,
+       do.n.k = FALSE, do.clus.stat = TRUE)
+  plot(object$silhouette.values$single.view$meth,
+       col = rainbow(C, s = 0.8),
+       cex = 0.8,
+       main = "Silhouette plot: Methylation View",
+       nmax.lab = 60, max.strlen = 5,
+       do.n.k = FALSE, do.clus.stat = TRUE)
+  plot(object$silhouette.values$single.view$mirna,
+       col = rainbow(C, s = 0.8),
+       cex = 0.8,
+       main = "Silhouette plot: miRNA View",
+       nmax.lab = 60, max.strlen = 5,
+       do.n.k = FALSE, do.clus.stat = TRUE)
+}
+
+plotSilhouetteMulti <- function(object, C){
+  plot(snf.gbm$silhouette.values$multi.view$ge,
+       col = rainbow(C, s = 0.8),
+       cex = 0.8,
+       main = "Silhouette plot: Gene Expression View",
+       nmax.lab = 60, max.strlen = 5,
+       do.n.k = FALSE, do.clus.stat = TRUE)
+  
+  plot(snf.gbm$silhouette.values$multi.view$meth,
+       col = rainbow(C, s = 0.8),
+       cex = 0.8,
+       main = "Silhouette plot: Methylation View",
+       nmax.lab = 60, max.strlen = 5,
+       do.n.k = FALSE, do.clus.stat = TRUE)
+  
+  plot(snf.gbm$silhouette.values$multi.view$mirna,
+       col = rainbow(C, s = 0.8),
+       cex = 0.8,
+       main = "Silhouette plot: mirna View",
+       nmax.lab = 60, max.strlen = 5,
+       do.n.k = FALSE, do.clus.stat = TRUE)
+}
 
 #Plot survival curves
  plotSurvivalCurves <- function(disease, group.prediction){

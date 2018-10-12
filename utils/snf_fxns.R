@@ -61,7 +61,8 @@ runSNFPipeline <- function(Data1, Data2, truelabel,
 }
 
 
-processRealData <- function(disease){
+processRealData <- function(disease, var.genes = FALSE, ks = TRUE){
+  require(edgeR)
   #Load up the appropriate disease data views file paths
   data.views <- chooseDataType(disease)
   #Separate survival data file path
@@ -75,8 +76,42 @@ processRealData <- function(disease){
   #Process the data set
   data.views <- lapply(data.views, FUN = function(view){t(as.matrix(view))})
   
-  #Normalization
-  data.views <- lapply(data.views, FUN = standardNormalization)
+  if(var.genes){
+    #alternatively use ks.test to measure difference between distributions...
+    findWideGenes <- function(view){
+      widths <- lapply(colnames(view), FUN = function(gene){diff(range(view[,gene]))})
+      names(widths) <- colnames(view)
+      widths <- names(rev(sort(unlist(widths))))
+      wide <- widths[1:floor(0.25*length(widths))]
+      return(wide)
+    }
+    
+    var.genes <- lapply(data.views, FUN = function(view){findWideGenes(view)})
+    data.views <- lapply(1:length(data.views), FUN = function(idx){data.views[[idx]][,var.genes[[idx]]]})
+    
+    #TODO var genes calulcations
+  }else if(ks){
+    ksDist <- function(gene){
+      base.dist <- rnorm(length(gene), mean = 0, sd = 1)
+      test.result <- ks.test(gene, base.dist)
+      return(test.result$p.value)
+    }
+     calcKSDist <- function(view){
+       ks.dists <- lapply(colnames(view), FUN = function(gene){ksDist(view[,gene])})
+       names(ks.dists) <- colnames(view)
+       
+       ks.dists <- unlist(ks.dists)
+       ks.dists <- names(ks.dists[ks.dists < 0.05])
+       return(ks.dists)
+       
+     }
+    
+     ks.dists <- lapply(data.views, FUN = function(view){calcKSDist(view)})
+     data.views <- lapply(1:length(data.views), FUN = function(idx){data.views[[idx]][, ks.dists[[idx]]]})
+    
+  }
+  #Normalization -- data is already normalized...
+  #data.views <- lapply(data.views, FUN = standardNormalization)
   
   #TODO Find variable gene function use for pca....
   
@@ -96,45 +131,24 @@ runSNFPipelineRealData <- function(object, opt.iter, truelabel = NULL,
   data.views <- object$data.views
   views.pca <- object$views.pca
   survival <- object$survival
+  n.views <- length(data.views)
   
-  ######
-  #optimize individual data views
-  
-  opt.params <- list()
-  
-  for(idx in c(1:length(data.views))){
-    view.pca <- views.pca[[idx]]
-    
-    #opt.params[[idx]] <- BayesianOptimization(FUN = maximizeSingleView,
-    #                                          bounds = list(K = c(10L,50L), alpha = c(0.1, 5.0),
-    #                                                        C = c(2L,15L),  iter = c(10,10),
-    #                                                        num.pcs = c(5L,100L)),
-    #                                          n_iter = 10, init_points = 10, acq = 'ucb',
-    #                                          init_grid_dt = NULL,
-    #                                          eps = 0.1)
-    
-    opt.params[[idx]] <- randomSearchParams(search.iterations = 500)
-    
-  }
-  
-  names(opt.params) <- names(views.pca)
-  
-  ######
-  
-  
-  
+  #num pcs
+  views.pca <- lapply(views.pca, FUN = function(view.pca){view.pca[,1:num.pcs]})
   
   #Calculate distance
-  data.views.dist <- lapply(data.views.pca, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
+  data.views.dist <- lapply(views.pca, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
   
   ## next, construct similarity graphs
   graph.views <- lapply(data.views.dist, FUN = affinityMatrix, K, alpha)#This One
   
+
   #Run SNF
   graph.views$W_fused <- SNF(Wall = graph.views, K = K, t = iter)#This One
   
   #Cluster
-  groupings = lapply(graph.views, FUN = function(graph.view){spectralClustering(affinity = graph.view, K = C)})#This one
+  groupings = lapply(graph.views,
+                     FUN = function(graph.view){anocva::spectralClustering(W = graph.view, k = C)})#This one
   
   
   #Cast the previously calculated distance matrics to type dist
@@ -142,7 +156,7 @@ runSNFPipelineRealData <- function(object, opt.iter, truelabel = NULL,
   
   #Calculate silhouette scores...
   #Matching up single data views with respectively defined clusterings
-  sils.single.views <- lapply(names(data.views),
+  sils.single.views <- lapply(1:n.views,
                               FUN = function(idx){silhouette(x = groupings[[idx]],
                                                              dist = data.views.dist[[idx]])})
   names(sils.single.views) <- names(data.views)
@@ -172,8 +186,6 @@ maximizeSingleView <- function(K, alpha, C, iter, num.pcs){
   graph.view <- try(affinityMatrix(view.dist, K, alpha))
   
   #Cluster
-  #grouping <- try(spectralClustering(affinity = graph.view, K = C, type = 1))
-  #grouping <- try(spectral.clustering(A = graph.view, K = C))
   grouping <- anocva::spectralClustering(W = graph.view, k = C)
   
   if(is.integer(grouping)){
@@ -181,7 +193,6 @@ maximizeSingleView <- function(K, alpha, C, iter, num.pcs){
     view.dist <- as.dist(view.dist)
     
     #Calculate silhouette scores...
-    #Matching up single data views with respectively defined clusterings
     sil <- silhouette(x = grouping, dist = view.dist)
   
     
@@ -197,18 +208,33 @@ maximizeSingleView <- function(K, alpha, C, iter, num.pcs){
 }
 
 
-discriminativeFeatureSelection <- function(data.views, ident){
+discriminativeFeatureSelection <- function(data.views, ident, n.features = 100, ntree = 50){
   require(SNFtool)
-  
-  calFeatureNMI <- function(data.view, ident){
-    #return(apply(data.view, 2, FUN = function(gene){calNMI(x = kmeans(gene, 10)$cluster, y = ident)}))
-    features.mi <- apply(data.view, 2, FUN = function(gene){calNMI(x = round(gene), y = ident)})
-    return(rev(sort(features.mi)))
+  require(randomForest)
+  n.views <- length(data.views)
+  rf.models <- lapply(1:n.views, FUN = function(idx){randomForest(data.views[[idx]], y = as.factor(ident),
+                                                                  importance = TRUE, ntree = ntree)})
+  names(rf.models) <- names(data.views)
+  getImportantFeatures <- function(rf.model){
+    imp <- rf.model$importance
+    feature.rank <- rev(order(imp[,"MeanDecreaseGini"]))
+    imp.features <- rownames(imp[feature.rank,])[1:n.features]
+    return(imp.features)
   }
   
-  data.views.sorted.feats <- lapply(data.views, FUN = calFeatureNMI, ident)
+  rf.model.features <- lapply(rf.models, FUN = getImportantFeatures)
   
-  return(data.views.sorted.feats)
+  return(rf.model.features)
+  
+  #calFeatureNMI <- function(data.view, ident){
+  #  #return(apply(data.view, 2, FUN = function(gene){calNMI(x = kmeans(gene, 10)$cluster, y = ident)}))
+  #  features.mi <- apply(data.view, 2, FUN = function(gene){calNMI(x = round(gene), y = ident)})
+  #  return(rev(sort(features.mi)))
+  #}
+  
+  #data.views.sorted.feats <- lapply(data.views, FUN = calFeatureNMI, ident)
+  
+  #return(data.views.sorted.feats)
 }
 
 runSNFPipeline2 <- function(disease = "GBM", opt.iter, truelabel = NULL,
@@ -242,31 +268,6 @@ runSNFPipeline2 <- function(disease = "GBM", opt.iter, truelabel = NULL,
   
   #Calculate distance
   data.views.dist <- lapply(data.views.pca, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
-  
-  #data.views.dist <- lapply(data.views.pca,
-  #                          FUN = function(data.view){as.matrix(dist(data.view,
-  #                                                                   method = "manhattan"))})
-  
-  #########
-  #Random Search hyperparameter optimization
-  #optimized.params <- randomSearchParams(data.views = data.views, search.iterations = opt.iter)
-  
-  
-  #optimized.params.bae <- BayesianOptimization(FUN = maximizeSNFGBM,
-  #                                             bounds = list(K = c(10L,50L), alpha = c(0.1, 5.0),
-  #                                                           C = c(2L,15L),  iter = c(10,10)),
-  #                                             n_iter = 49, init_points = 150, acq = 'ei',
-  #                                             eps = 0.1, kernel = list(type = "matern"))
-  
-  #maximizeSNFGBM()
-  
-  #K <- optimized.params$model.params$K
-  #alpha <- optimized.params$model.params$alpha
-  #iter <- optimized.params$model.params$iter
-  #C <- optimized.params$model.params$C
-
-  #Calculate distance
-  #data.views.dist <- lapply(data.views, FUN = function(view){dist2(as.matrix(view), as.matrix(view))})
   
   ## next, construct similarity graphs
   graph.views <- lapply(data.views.dist, FUN = affinityMatrix, K, alpha)#This One
@@ -302,7 +303,7 @@ runSNFPipeline2 <- function(disease = "GBM", opt.iter, truelabel = NULL,
 
 randomSearchParams <- function(search.iterations,
                                K.range = c(5:100), alpha.range = c(0.1, 5.0),
-                               iter.range = 10, C.range = c(2:10), num.pcs.range = c(1:99)){
+                               iter.range = 10, C.range = c(2:10), num.pcs.range = c(10:99)){
   params <- list()
   params$best.score <- numeric(0)
   
@@ -330,7 +331,7 @@ randomSearchParams <- function(search.iterations,
         
         params$best.score <- model.res$Score
         params$model.params <- list(K = K, alpha = alpha,
-                                    iter = iter, C = C)
+                                    iter = iter, C = C, num.pcs = num.pcs)
       }
     }
     i = i + 1
