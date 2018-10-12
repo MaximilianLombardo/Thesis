@@ -247,10 +247,18 @@ plotClustersDRSpace(fused.view = snf.gbm$affinity.matrices$W_fused,
 
 disc.features <- discriminativeFeatureSelection(snf.gbm.data$data.views, gene.sets$classical)
 
-plotFeatureHeatMap(data.view = snf.gbm.data$data.views$meth,
-                   features = colnames(snf.gbm.data$data.views$meth),
+plotFeatureHeatMap(data.view = snf.gbm.data$data.views$ge,
+                   features = names(disc.features$ge),
                    ident = snf.gbm$identity$W_fused,
-                   scale = "col", all.features = TRUE)#Might need a better way to choose features
+                   scale = "col", C = 4)
+plotFeatureHeatMap(data.view = snf.gbm.data$data.views$meth,
+                   features = names(disc.features$meth),
+                   ident = snf.gbm$identity$W_fused,
+                   scale = "col", C = 4)
+plotFeatureHeatMap(data.view = snf.gbm.data$data.views$mirna,
+                   features = names(disc.features$mirna),
+                   ident = snf.gbm$identity$W_fused,
+                   scale = "col", C = 4)
 
 #Read in the Verhaaken Gene Sets
 root.dir <- "~/Documents/gitRepos/master/data/GBM_genesets/"
@@ -326,13 +334,21 @@ plotClustersDRSpace(fused.view = mkkm.gbm$kernel.matrices$K_fused,
                     group.prediction = mkkm.gbm$identity$mkkm.model,
                     reduction.use = "pca", main.title = "PCA reduction of fused Matrix")
 ####
-#Discriminative Feature heat map
+#Discriminative Feature heat map -- change to mkkm instead of results found from SNF
 disc.features <- discriminativeFeatureSelection(snf.gbm.data$data.views, ident = snf.gbm$identity$W_fused)
 
 plotFeatureHeatMap(data.view = snf.gbm.data$data.views$ge,
                    features = names(disc.features$ge),
                    ident = snf.gbm$identity$W_fused,
-                   scale = "col", all.features = TRUE)
+                   scale = "col", C = 4)
+plotFeatureHeatMap(data.view = snf.gbm.data$data.views$meth,
+                   features = names(disc.features$meth),
+                   ident = snf.gbm$identity$W_fused,
+                   scale = "col", C = 4)
+plotFeatureHeatMap(data.view = snf.gbm.data$data.views$mirna,
+                   features = names(disc.features$mirna),
+                   ident = snf.gbm$identity$W_fused,
+                   scale = "col", C = 4)
 
 
 ```
