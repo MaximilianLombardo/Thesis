@@ -2,7 +2,7 @@
 #Plotting functions
 ####################################
 
-plotFeatureHeatMap <- function(data.view, features, ident, scale = "col", all.features = FALSE){
+plotFeatureHeatMap <- function(data.view, features, ident, scale = "col", all.features = FALSE, C){
   require(d3heatmap)
   require(RColorBrewer)
   #require(gplots)
@@ -20,8 +20,13 @@ plotFeatureHeatMap <- function(data.view, features, ident, scale = "col", all.fe
   
   new.palette <- colorRampPalette(brewer.pal(9, "Spectral"),space="rgb")
   
+  group.colors <- rainbow(n = C, s = 0.5)
+  group.colors <- group.colors[ident][ind]
+  
   heatmap(x = t(data.view[ind,features]),
-          Rowv = NA, Colv = NA, keep.dendro = FALSE, col=new.palette(100),labRow = as.character(ident), )
+          Rowv = TRUE, Colv = NA, keep.dendro = FALSE,
+          col=new.palette(100), labCol = as.character(ident[ind]),
+          cexCol = 0.01, ColSideColors = group.colors)
   
 }
 
@@ -41,7 +46,7 @@ plotClustersDRSpace <- function(fused.view,
                   aes(x = PC1, y = PC2, color = factor(group.prediction))) + geom_point() 
     plt + ggtitle(main.title) + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "Predicted Identity")
   }else{
-    view.tsne <- Rtsne(X = fused.view, perplexity = 75, theta = 0.1, pca = FALSE)$Y
+    view.tsne <- Rtsne(X = fused.view, perplexity = 30, theta = 0.1, pca = FALSE)$Y
     colnames(view.tsne) <- c("tSNE1", "tSNE2")
     view.tsne <- cbind(view.tsne, group.prediction)
     plt <- ggplot(data.frame(view.tsne),
@@ -76,21 +81,21 @@ plotSilhouetteSingle <- function(object, C){
 }
 
 plotSilhouetteMulti <- function(object, C){
-  plot(snf.gbm$silhouette.values$multi.view$ge,
+  plot(object$silhouette.values$multi.view$ge,
        col = rainbow(C, s = 0.8),
        cex = 0.8,
        main = "Silhouette plot: Gene Expression View",
        nmax.lab = 60, max.strlen = 5,
        do.n.k = FALSE, do.clus.stat = TRUE)
   
-  plot(snf.gbm$silhouette.values$multi.view$meth,
+  plot(object$silhouette.values$multi.view$meth,
        col = rainbow(C, s = 0.8),
        cex = 0.8,
        main = "Silhouette plot: Methylation View",
        nmax.lab = 60, max.strlen = 5,
        do.n.k = FALSE, do.clus.stat = TRUE)
   
-  plot(snf.gbm$silhouette.values$multi.view$mirna,
+  plot(object$silhouette.values$multi.view$mirna,
        col = rainbow(C, s = 0.8),
        cex = 0.8,
        main = "Silhouette plot: mirna View",
@@ -99,12 +104,12 @@ plotSilhouetteMulti <- function(object, C){
 }
 
 #Plot survival curves
- plotSurvivalCurves <- function(disease, group.prediction){
+ plotSurvivalCurves <- function(disease, group.prediction, root.dir){
    require(survminer)
    require(survival)
    
    #Load up the appropriate disease data views file paths
-   data.views <- chooseDataType(disease)
+   data.views <- chooseDataType(disease, root.dir = root.dir)
    #Separate survival data file path
    survival <- data.views[4]
    survival <- read.table(survival, header = TRUE)

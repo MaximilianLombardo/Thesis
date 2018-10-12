@@ -13,17 +13,20 @@ knitr::opts_chunk$set(echo = TRUE)
 #Making figures using simulated data
 #Make sure to have local version of SNFTool installed
 #Load utility functions
-#util.fxns <- "~/Documents/uva/master/the/utils/simMVData.R" 
-util.fxns <- "~/Documents/gitRepos/master/utils/simMVData.R"
+util.fxns <- "~/Documents/uva/master/the/utils/simMVData.R" 
+#util.fxns <- "~/Documents/gitRepos/master/utils/simMVData.R"
 source(util.fxns)
 
-
-#snf.fxns <- "~/Documents/uva/master/the/utils/snf_fxns.R"
-snf.fxns <- "~/Documents/gitRepos/master/utils/snf_fxns.R"
+snf.fxns <- "~/Documents/uva/master/the/utils/snf_fxns.R"
+#snf.fxns <- "~/Documents/gitRepos/master/utils/snf_fxns.R"
 source(snf.fxns)
 
-#plotting.fxns <- "~/Documents/uva/master/the/utils/plotting_fxns.R"
-plotting.fxns <- "~/Documents/gitRepos/master/utils/plotting_fxns.R"
+#Source mkkm functions
+mkm.fxns <- "~/Documents/uva/master/the/utils/mkkm_fxns.R"
+
+
+plotting.fxns <- "~/Documents/uva/master/the/utils/plotting_fxns.R"
+#plotting.fxns <- "~/Documents/gitRepos/master/utils/plotting_fxns.R"
 source(plotting.fxns)
 
 ###Clean up this particular set of functions, redundant
@@ -181,7 +184,7 @@ gene.sets$proneural <- read.table(paste0(root.dir, "geneset_proneural.txt"), str
 
 
 
-snf.gbm.data <- processRealData(disease = "GBM", genes.use = sort(unique(unlist(gene.sets))))
+snf.gbm.data <- processRealData(disease = "GBM", ks = TRUE, root.dir = "~/Documents/uva/master/data/SNF/")
 #Manual parameters
 C <- 4
 K <- 50
@@ -218,7 +221,7 @@ plotSurvivalCurves(disease = "GBM",
                    group.prediction = snf.gbm$identity$meth)
 plotSurvivalCurves(disease = "GBM",
                    group.prediction = snf.gbm$identity$mirna)
-plotSurvivalCurves(disease = "GBM",
+plotSurvivalCurves(disease = "GBM", root.dir = "~/Documents/uva/master/data/SNF/",
                    group.prediction = snf.gbm$identity$W_fused)
 
 #Plot the cluster layout using a pca based or tsne based coordinate system...
@@ -268,15 +271,68 @@ gene.sets$proneural <- read.table(paste0(root.dir, "geneset_proneural.txt"), str
 
 
 ```{r}
+#Analyze the GBM data using multiple kernel K-means
 
-#Plot dimensionality reduction of groupings/fused kernels found by multiple kernel K means...
 
+mkkm.gbm.data <- processRealData(disease = "GBM", ks = TRUE, root.dir = "~/Documents/uva/master/data/SNF/")
+
+mkkm.gbm <- runMKKMPipelineRealData(object = mkkm.gbm.data, C = 4, num.pcs = 15)
+
+
+#Make some silhouette plots - Single Data View predictions against single data view distances package these silhouette plots up!
+plotSilhouetteSingle(mkkm.gbm, C)
+
+
+#More silhouette Plots - Fused Data View predictions against single data view distances --- 
+
+plotSilhouetteMulti(mkkm.gbm, C)
+
+#Heatmap comparison
+#Plot affinity matrices 
+plotSNFHeatComparison2(all.data = mkkm.gbm$kernel.matrices,
+                      true.labels = mkkm.gbm$identity,
+                      down.pct = 1)
+
+
+#Plotting the survival curves for all GBM patients, grouped by predicitions made from the Similarity Network Fusion approach vs groupings for single dataviews??
+#Survival curves of individual view predictions and fused predictions
+plotSurvivalCurves(disease = "GBM", root.dir = "~/Documents/uva/master/data/SNF/",
+                   group.prediction = mkkm.gbm$identity$ge)
+plotSurvivalCurves(disease = "GBM", root.dir = "~/Documents/uva/master/data/SNF/",
+                   group.prediction = mkkm.gbm$identity$meth)
+plotSurvivalCurves(disease = "GBM", root.dir = "~/Documents/uva/master/data/SNF/",
+                   group.prediction = mkkm.gbm$identity$mirna)
+plotSurvivalCurves(disease = "GBM", root.dir = "~/Documents/uva/master/data/SNF/",
+                   group.prediction = mkkm.gbm$identity$mkkm.model)
+
+
+
+#Plot the cluster layout using a pca based or tsne based coordinate system...
+#Quality of other data views? -- these other data views look like absolute trash...
+plotClustersDRSpace(fused.view = t(mkkm.gbm.data$data.views$ge),
+                    group.prediction = mkkm.gbm$identity$mkkm.model,
+                    reduction.use = "pca", main.title = "PCA reduction of Gene Expression Matrix")
+
+
+plotClustersDRSpace(fused.view = t(mkkm.gbm.data$data.views$meth),
+                    group.prediction = mkkm.gbm$identity$mkkm.model,
+                    reduction.use = "pca", main.title = "PCA reduction of Meth Matrix")
+
+plotClustersDRSpace(fused.view = t(mkkm.gbm.data$data.views$mirna),
+                    group.prediction = mkkm.gbm$identity$mkkm.model,
+                    reduction.use = "pca", main.title = "PCA reduction of miRNA Matrix")
+
+plotClustersDRSpace(fused.view = mkkm.gbm$kernel.matrices$K_fused,
+                    group.prediction = mkkm.gbm$identity$mkkm.model,
+                    reduction.use = "pca", main.title = "PCA reduction of fused Matrix")
+####
+#Discriminative Feature heat map
+disc.features <- discriminativeFeatureSelection(snf.gbm.data$data.views, ident = snf.gbm$identity$W_fused)
 
 plotFeatureHeatMap(data.view = snf.gbm.data$data.views$ge,
-                   features = gene.sets$mesenchymal,
+                   features = names(disc.features$ge),
                    ident = snf.gbm$identity$W_fused,
-                   scale = "col")#Might need a better way to choose features
-
+                   scale = "col", all.features = TRUE)
 
 
 ```

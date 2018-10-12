@@ -1,3 +1,58 @@
+#The Multiple kernel k means pipeline for real data
+runMKKMPipelineRealData <- function(object, C = 2, num.pcs){
+  require(SNFtool)
+  require(RColorBrewer)
+  require(cluster)
+  require(abind)
+  
+  data.views <- object$data.views
+  views.pca <- object$views.pca
+  survival <- object$survival
+  n.views <- length(data.views)
+  
+  #num pcs
+  views.pca <- lapply(views.pca, FUN = function(view.pca){view.pca[,1:num.pcs]})
+  
+  ######################################################################################
+  kernels <- lapply(views.pca, FUN = function(view.pca){optimizeRBFKernel(t(view.pca))})#Optimized Kernels based on KSdist
+  kernel.array <- do.call(abind, c(kernels, list(along = 3)))
+  
+  #single view kernel k means
+  models <- lapply(kernels, FUN = function(kernel.matrix){runKKM(kernel.matrix = kernel.matrix, clusters = C)})
+  
+  #mkkm
+  models$mkkm.model <- runMKKM(kernel.array = kernel.array, clusters = C)
+  ######################################################################################
+  #summarize results, kernels, etc from single and multi view kernel k means models
+  #Kernels
+  kernels$K_fused <- models$mkkm.model$combined.kernel
+  #Groupings/predictions
+  groupings <- lapply(models, FUN = function(model){model$state$clustering})
+  
+  
+  
+  #Calculate distance -- need this function later for calculaing the silhouette coefficients
+  data.views.dist <- lapply(views.pca, FUN = function(view.pca){dist2(as.matrix(view.pca), as.matrix(view.pca))})
+  data.views.dist <- lapply(data.views.dist, FUN = function(view.dist){as.dist(view.dist)})
+  
+  #Calculate silhouette scores...HERE
+  #Matching up single data views with respectively defined clusterings
+  sils.single.views <- lapply(1:n.views,
+                              FUN = function(idx){silhouette(x = groupings[[idx]],
+                                                             dist = data.views.dist[[idx]])})
+  names(sils.single.views) <- names(data.views)
+  
+  sil.multiview <- lapply(data.views.dist,
+                          FUN = function(data.view.dist){silhouette(x = groupings$mkkm.model,
+                                                                    dist = data.view.dist)})
+  
+  
+  return(list(kernel.matrices = kernels,
+              silhouette.values = list(single.view = sils.single.views, multi.view = sil.multiview),
+              identity = groupings))
+}
+
+
 #The Multiple kernel k means pipeline for simulated data
 runMKKMPipeline <- function(data.views, truelabel,
                             K = 20, alpha = 0.5, iter = 10,
@@ -162,19 +217,36 @@ runMKKM <- function(kernel.array, clusters = 2, iter = 10){
   
   model <- list()
   
-  #model$res <- mkkc(kernel.array, centers = clusters, iter.max = iter)
-  ###########################################################################################
   #mehmet
   parameters <- list()
   parameters$cluster_count <- clusters
   parameters$iteration_count <- iter
   model$state <- mkkmeans_train(kernel.array, parameters)
-  ###########################################################################################
-  model$combined.kernel <- combineKernels(kernel.array, state$theta)
+  model$combined.kernel <- combineKernels(kernel.array, model$state$theta)
   
   return(model)
   
 }
+
+runKKM <- function(kernel.matrix, clusters = 2){
+  
+  model <- list()
+  
+  parameters <- list()
+  
+  #set the number of clusters
+  parameters$cluster_count <- clusters
+  
+  #initialize the kernel
+  K <- kernel.matrix #should be an N x N matrix containing similarity values between samples
+    
+  #perform training
+  model$state <- kkmeans_train(K, parameters)
+  
+  return(model)
+  
+}
+
 ##############################################################################################################
 combineKernels <- function(kernels, kernel.params){
   for(i in 1:length(kernel.params)){
@@ -226,6 +298,21 @@ mkkmeans_train <- function(Km, parameters) {
     state$parameters <- parameters
     state$theta <- theta
   })
+  return(state)
+}
+
+kkmeans_train <- function(K, parameters) {
+  state <- list()
+  state$time <- system.time({
+    H <- eigen(K, symmetric = TRUE)$vectors[, 1:parameters$cluster_count]
+    objective <- sum(diag(t(H) %*% K %*% H)) - sum(diag(K))
+    H_normalized <- H / matrix(sqrt(rowSums(H^2, 2)), nrow(H), parameters$cluster_count, byrow = FALSE)
+    
+    set.seed(NULL)
+    state$clustering <- kmeans(H_normalized, centers = parameters$cluster_count, iter.max = 1000, nstart = 10)$cluster
+    state$objective <- objective
+    state$parameters <- parameters
+  })    
   return(state)
 }
 

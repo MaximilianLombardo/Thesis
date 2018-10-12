@@ -61,15 +61,16 @@ runSNFPipeline <- function(Data1, Data2, truelabel,
 }
 
 
-processRealData <- function(disease, var.genes = FALSE, ks = TRUE){
+processRealData <- function(disease, var.genes = FALSE, ks = TRUE, root.dir){
   require(edgeR)
   #Load up the appropriate disease data views file paths
-  data.views <- chooseDataType(disease)
+  data.views <- chooseDataType(disease, root.dir = root.dir)
   #Separate survival data file path
   survival <- data.views[4]
   #Read in data views and survival
   data.views <- lapply(data.views[1:3], FUN = read.table)
-  names(data.views) <- c("ge", "meth", "mirna")
+  view.names <- c("ge", "meth", "mirna")
+  names(data.views) <- view.names
   
   survival <- read.table(survival, header = TRUE)
   
@@ -108,6 +109,7 @@ processRealData <- function(disease, var.genes = FALSE, ks = TRUE){
     
      ks.dists <- lapply(data.views, FUN = function(view){calcKSDist(view)})
      data.views <- lapply(1:length(data.views), FUN = function(idx){data.views[[idx]][, ks.dists[[idx]]]})
+     names(data.views) <- view.names
     
   }
   #Normalization -- data is already normalized...
@@ -208,24 +210,36 @@ maximizeSingleView <- function(K, alpha, C, iter, num.pcs){
 }
 
 
-discriminativeFeatureSelection <- function(data.views, ident, n.features = 100, ntree = 50){
-  require(SNFtool)
-  require(randomForest)
+discriminativeFeatureSelection <- function(data.views, ident, n.features = 100){
+  #require(SNFtool)
+  #require(randomForest)
+  
   n.views <- length(data.views)
-  rf.models <- lapply(1:n.views, FUN = function(idx){randomForest(data.views[[idx]], y = as.factor(ident),
-                                                                  importance = TRUE, ntree = ntree)})
-  names(rf.models) <- names(data.views)
-  getImportantFeatures <- function(rf.model){
-    imp <- rf.model$importance
-    feature.rank <- rev(order(imp[,"MeanDecreaseGini"]))
-    imp.features <- rownames(imp[feature.rank,])[1:n.features]
-    return(imp.features)
+  #########################################################
+  miDC <- function(data.view, ident){
+
+    mi <- apply(data.view, 2, FUN = function(gene){mpmi::mmi.pw(cts = gene, disc = ident)$mi})
+    return(rev(sort(mi))[1:n.features])
   }
   
-  rf.model.features <- lapply(rf.models, FUN = getImportantFeatures)
+  views.mi <- lapply(data.views, FUN = function(data.view){miDC(data.view, ident)})
   
-  return(rf.model.features)
+  return(views.mi)
+  #########################################################
+  #rf.models <- lapply(1:n.views, FUN = function(idx){randomForest(data.views[[idx]], y = as.factor(ident),
+  #                                                                importance = TRUE, ntree = ntree)})
+  #names(rf.models) <- names(data.views)
+  #getImportantFeatures <- function(rf.model){
+  #  imp <- rf.model$importance
+  #  feature.rank <- rev(order(imp[,"MeanDecreaseGini"]))
+  #  imp.features <- rownames(imp[feature.rank,])[1:n.features]
+  #  return(imp.features)
+  #}
   
+  #rf.model.features <- lapply(rf.models, FUN = getImportantFeatures)
+  
+  #return(rf.model.features)
+  #########################################################
   #calFeatureNMI <- function(data.view, ident){
   #  #return(apply(data.view, 2, FUN = function(gene){calNMI(x = kmeans(gene, 10)$cluster, y = ident)}))
   #  features.mi <- apply(data.view, 2, FUN = function(gene){calNMI(x = round(gene), y = ident)})
@@ -235,6 +249,7 @@ discriminativeFeatureSelection <- function(data.views, ident, n.features = 100, 
   #data.views.sorted.feats <- lapply(data.views, FUN = calFeatureNMI, ident)
   
   #return(data.views.sorted.feats)
+  ########################################################
 }
 
 runSNFPipeline2 <- function(disease = "GBM", opt.iter, truelabel = NULL,
