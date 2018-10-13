@@ -1,0 +1,17 @@
+---
+title: "makePlotsChapter5"
+author: "Maximilian Lombardo"
+date: "10/13/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Load up the Dream Data
+```{r}
+dream.data <- loadDreamDataSets(root.dir = "~/Documents/uva/master/data/DREAM7/TrainSelect/")
+
+```
