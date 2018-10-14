@@ -58,3 +58,76 @@ formatDreamData <- function(data.name, dream.data){
     return(data.set)
   }
 }
+
+processDreamData <- function(object){
+  require(SNFtool)
+  
+  #Perform various processing steps on each dataset
+  #CV thresholds
+  #     Gene Expression 0.1
+  #     Methylation     1.0
+  #     RNAseq
+  #     RPPA
+  #     SNP6
+  object$GeneExpression <- normalizeData(data.set = object$GeneExpression,
+                                         cv.threshold = 0.1, pca =FALSE ,
+                                         var.features = TRUE)
+  object$Methylation <- normalizeData(data.set = object$Methylation,
+                                      cv.threshold = 1.0, pca =FALSE ,
+                                      var.features = TRUE)
+  object$RNAseq_quantification <- normalizeData(data.set = object$RNAseq_quantification,
+                                                cv.threshold =, pca =FALSE ,
+                                                var.features = TRUE)
+  object$RPPA <- normalizeData(data.set = object$RPPA,
+                                                cv.threshold =, pca =FALSE ,
+                                                var.features = TRUE)
+  object$SNP6_gene_level <- normalizeData(data.set = object$SNP6_gene_level,
+                                                cv.threshold =, pca =FALSE ,
+                                                var.features = TRUE)
+  return(object)
+}
+
+
+
+normalizeData <- function(data.set, cv.threshold, pca = FALSE, var.features = TRUE){
+  require(SNFtool)
+  
+  if(var.features){
+    #Choose the variable features
+    data.set <- getVariableFeatures(data.set = data.set)
+  }
+  
+  #Standard Normalization from SNFtool
+  data.set <- t(standardNormalization(t(data.set)))
+  
+  if(pca){
+    data.set <- prcomp(x = data.set)$rotation
+  }
+  
+  return(data.set)
+}
+
+getVariableFeatures <- function(data.set){
+    feature.cvs <- lapply(rownames(data.set), FUN = function(feature){calcCV(as.numeric(data.set[feature,]))})
+    names(feature.cvs) <- rownames(data.set)
+    feature.cvs <- unlist(feature.cvs)
+    
+    var.features <- names(feature.cvs[feature.cvs > cv.threshold])
+    data.set <- data.set[var.features,]
+    
+    return(data.set)
+}
+
+
+calcCV <- function(gene){
+    return(sd(gene)/mean(gene))
+}
+
+
+
+
+
+
+
+
+

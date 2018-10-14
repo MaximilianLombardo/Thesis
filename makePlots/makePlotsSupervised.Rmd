@@ -9,9 +9,25 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
-Load up the Dream Data
+Source the necessary functions
 ```{r}
-dream.data <- loadDreamDataSets(root.dir = "~/Documents/uva/master/data/DREAM7/TrainSelect/")
+sourceFunctions<- function(location = "home"){
+  if(location == "home"){
+    source("~/Documents/gitRepos/master/utils/loadDREAMData.R")
+  }
+}
 
+sourceFunctions()
+
+```
+
+Load up the Dream Data and do some preprocessing
+```{r}
+
+#Load that mother up!
+dream.data <- loadDreamDataSets(root.dir = "~/Documents/gitRepos/master/data/DREAM7/TrainSelect/")
+
+
+#Process that mother!
+dream.data <- processDreamData(dream.data)
 ```
