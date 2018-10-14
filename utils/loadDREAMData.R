@@ -59,7 +59,7 @@ formatDreamData <- function(data.name, dream.data){
   }
 }
 
-processDreamData <- function(object){
+processDreamData <- function(object, impute = TRUE){
   require(SNFtool)
   
   #Perform various processing steps on each dataset
@@ -76,18 +76,29 @@ processDreamData <- function(object){
                                       cv.threshold = 1.0, pca =FALSE ,
                                       var.features = TRUE)
   object$RNAseq_quantification <- normalizeData(data.set = object$RNAseq_quantification,
-                                                cv.threshold =, pca =FALSE ,
+                                                cv.threshold = 1.0, pca =FALSE ,
                                                 var.features = TRUE)
   object$RPPA <- normalizeData(data.set = object$RPPA,
-                                                cv.threshold =, pca =FALSE ,
+                                                cv.threshold = 1.0, pca =FALSE ,
                                                 var.features = TRUE)
   object$SNP6_gene_level <- normalizeData(data.set = object$SNP6_gene_level,
-                                                cv.threshold =, pca =FALSE ,
+                                                cv.threshold = 1.0, pca =FALSE ,
                                                 var.features = TRUE)
+  
+  if(impute){
+    #Also impute missing values for our target matrix
+    object$Drug_Response_Training <- imputeDrugResponse(object$Drug_Response_Training)
+  }
+  
   return(object)
 }
 
-
+imputeDrugResponse() <- function(drug.response){
+  require(missForest)
+  #Tune parameters?
+  imp <- missForest(drug.response)
+  return(imp$ximp)
+}
 
 normalizeData <- function(data.set, cv.threshold, pca = FALSE, var.features = TRUE){
   require(SNFtool)
