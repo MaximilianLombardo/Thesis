@@ -70,20 +70,22 @@ processDreamData <- function(object, impute = TRUE){
   #     RPPA
   #     SNP6
   object$GeneExpression <- normalizeData(data.set = object$GeneExpression,
-                                         cv.threshold = 0.1, pca =FALSE ,
+                                         cv.threshold = 0.1, pca = FALSE ,
                                          var.features = TRUE)
   object$Methylation <- normalizeData(data.set = object$Methylation,
-                                      cv.threshold = 1.0, pca =FALSE ,
+                                      cv.threshold = 1.0, pca = FALSE ,
                                       var.features = TRUE)
   object$RNAseq_quantification <- normalizeData(data.set = object$RNAseq_quantification,
-                                                cv.threshold = 1.0, pca =FALSE ,
+                                                cv.threshold = 5.0, pca = FALSE ,
                                                 var.features = TRUE)
   object$RPPA <- normalizeData(data.set = object$RPPA,
-                                                cv.threshold = 1.0, pca =FALSE ,
-                                                var.features = TRUE)
-  object$SNP6_gene_level <- normalizeData(data.set = object$SNP6_gene_level,
-                                                cv.threshold = 1.0, pca =FALSE ,
-                                                var.features = TRUE)
+                                                cv.threshold = NULL, pca = FALSE ,
+                                                var.features = FALSE)
+  
+  #omitting NA rows for SNP data, better to impute?
+  object$SNP6_gene_level <- normalizeData(data.set = na.omit(object$SNP6_gene_level),
+                                                cv.threshold = NULL, pca = TRUE ,
+                                                var.features = FALSE)
   
   if(impute){
     #Also impute missing values for our target matrix
@@ -93,7 +95,7 @@ processDreamData <- function(object, impute = TRUE){
   return(object)
 }
 
-imputeDrugResponse() <- function(drug.response){
+imputeDrugResponse <- function(drug.response){
   require(missForest)
   #Tune parameters?
   imp <- missForest(drug.response)
@@ -105,23 +107,24 @@ normalizeData <- function(data.set, cv.threshold, pca = FALSE, var.features = TR
   
   if(var.features){
     #Choose the variable features
-    data.set <- getVariableFeatures(data.set = data.set)
+    data.set <- getVariableFeatures(data.set = data.set, cv.threshold)
   }
   
   #Standard Normalization from SNFtool
   data.set <- t(standardNormalization(t(data.set)))
   
   if(pca){
-    data.set <- prcomp(x = data.set)$rotation
+    data.set <- t(prcomp(x = data.set)$rotation)
   }
   
   return(data.set)
 }
 
-getVariableFeatures <- function(data.set){
+getVariableFeatures <- function(data.set, cv.threshold){
     feature.cvs <- lapply(rownames(data.set), FUN = function(feature){calcCV(as.numeric(data.set[feature,]))})
     names(feature.cvs) <- rownames(data.set)
     feature.cvs <- unlist(feature.cvs)
+    feature.cvs[is.nan(feature.cvs)] <- 0
     
     var.features <- names(feature.cvs[feature.cvs > cv.threshold])
     data.set <- data.set[var.features,]

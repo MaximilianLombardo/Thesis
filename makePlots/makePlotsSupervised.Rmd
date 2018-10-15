@@ -30,4 +30,11 @@ dream.data <- loadDreamDataSets(root.dir = "~/Documents/gitRepos/master/data/DRE
 
 #Process that mother!
 dream.data <- processDreamData(dream.data)
+
+
 ```
+
+```{r}
+
+```
+
