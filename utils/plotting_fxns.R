@@ -5,7 +5,12 @@
 plotFeatureHeatMap <- function(data.view, features, ident, scale = "col", all.features = FALSE, C){
   require(d3heatmap)
   require(RColorBrewer)
+  require(scales)
   #require(gplots)
+  
+  #rescale the data view matrix so that each feature falls between -1 and 1
+  data.view <- apply(data.view, 2, FUN = function(feature){rescale(x = feature, to = c(-1,1))})
+  
   
   #features <- ifelse(test = all.features,
   #                   yes = colnames(data.view),
