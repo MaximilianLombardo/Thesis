@@ -80,3 +80,8 @@ dipg <- FindClusters(object = dipg, reduction.type = "pca", dims.use = 1:25,
 
 
 ```
+
+
+```{r}
+dipg@meta.data$Batch <- unlist(lapply(dipg@cell.names, FUN = function(cell.name){unlist(strsplit(cell.name, split = "\\."))[1]}))
+```

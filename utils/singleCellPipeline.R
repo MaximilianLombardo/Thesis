@@ -14,12 +14,36 @@ readRegevData <- function(file.path = "~/Documents/uva/master/data/RegevSingleCe
   return(sc.data)
 }
 
-runSIMLRPipeline <- function(object, pca = TRUE, num.pcs = NULL){
+runSIMLRPipeline <- function(object, pca = TRUE, num.pcs = NULL, smoothing.fxn.location = "~/Documents/uva/master/the/utils/knnSmoothing.R", n.sample){
   require(SIMLR)
+  source(smoothing.fxn.location)
+  
+  smooth.exp <- knn_smoothing(mat = object@data[1:100, 1:100], k = 4, d = 10)
+  
+  object <- AddSmoothedScore(object)
+  
   
  t(object@dr$pca@cell.embeddings)
   
   
-  simlr.result <- SIMLR(X = t(object@dr$pca@cell.embeddings), c = 5, k = 25, cores.ratio = 0.5, normalize = FALSE)
+ #This worked out, however, I'd like to try and avoid 
+  idx <- sample(x = 1:ncol(data.matrix),size = n.sample)
+  simlr.result <- SIMLR(X = t(object@dr$pca@cell.embeddings[1:1000,1:num.pcs]), c = 6, k = 25, cores.ratio = 0.5, normalize = FALSE)
+  
+}
+
+calcNearestNeighbors <- function(data.matrix){
+  require(RANN)
+  require(dbscan)
+  #data.matrix is a samples by features matrix (n x m)
+  
+  nn.result <- nn2(data = data.matrix, k = 10)
+  
+  nn.result$nn.dists
+  
+  kmeans.results <- kmeans(x = data.matrix, centers = 1000, iter.max = 1000)
+  
+  
+  dbscan.result <- dbscan(x = data.matrix, eps = 1, borderPoints = FALSE, minPts = 3)
   
 }
