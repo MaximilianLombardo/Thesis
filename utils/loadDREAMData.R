@@ -76,15 +76,15 @@ processDreamData <- function(object, impute = TRUE){
                                       cv.threshold = 1.0, pca = FALSE ,
                                       var.features = TRUE)
   object$RNAseq_quantification <- normalizeData(data.set = object$RNAseq_quantification,
-                                                cv.threshold = 5.0, pca = FALSE ,
+                                                cv.threshold = 5.0, pca = TRUE,
                                                 var.features = TRUE)
   object$RPPA <- normalizeData(data.set = object$RPPA,
-                                                cv.threshold = NULL, pca = FALSE ,
+                                                cv.threshold = NULL, pca = FALSE,
                                                 var.features = FALSE)
   
   #omitting NA rows for SNP data, better to impute?
   object$SNP6_gene_level <- normalizeData(data.set = na.omit(object$SNP6_gene_level),
-                                                cv.threshold = NULL, pca = TRUE ,
+                                                cv.threshold = NULL, pca = TRUE,
                                                 var.features = FALSE)
   
   if(impute){

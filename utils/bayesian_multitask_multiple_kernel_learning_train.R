@@ -58,6 +58,7 @@ bayesian_multitask_multiple_kernel_learning_train <- function(Km, y, parameters)
   btimesbT.mu <- tcrossprod(be$mu[1:T], be$mu[1:T]) + be$sigma[1:T, 1:T]
   etimeseT.mu <- tcrossprod(be$mu[(T + 1):(T + P)], be$mu[(T + 1):(T + P)]) + be$sigma[(T + 1):(T + P), (T + 1):(T + P)]
   etimesb.mu <- matrix(0, P, T)
+
   for (t in 1:T) {
     etimesb.mu[,t] <- be$mu[(T + 1):(T + P)] * be$mu[t] + be$sigma[(T + 1):(T + P), t]
   }

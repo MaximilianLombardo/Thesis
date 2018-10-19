@@ -14,10 +14,12 @@ Source the necessary functions
 sourceFunctions<- function(location = "home"){
   if(location == "home"){
     source("~/Documents/gitRepos/master/utils/loadDREAMData.R")
+  }else{
+    source("~/Documents/uva/master/the/utils/loadDREAMData.R")
   }
 }
 
-sourceFunctions()
+sourceFunctions(location = "nothome")
 
 ```
 
@@ -25,7 +27,9 @@ Load up the Dream Data and do some preprocessing
 ```{r}
 
 #Load that mother up!
-dream.data <- loadDreamDataSets(root.dir = "~/Documents/gitRepos/master/data/DREAM7/TrainSelect/")
+#dream.data <- loadDreamDataSets(root.dir = "~/Documents/gitRepos/master/data/DREAM7/TrainSelect/")#laptop
+dream.data <- loadDreamDataSets(root.dir = "~/Documents/uva/master/data/DREAM7/TrainSelect/")#desktop location
+
 
 
 #Process that mother!
