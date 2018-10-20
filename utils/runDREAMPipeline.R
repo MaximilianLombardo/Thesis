@@ -1,151 +1,87 @@
-runDreamPipeline <- function(object, bmtmkl.dir = "~/Documents/gitRepos/master/utils/"){
+runDreamPipeline <- function(object, bmtmkl.dir = "~/Documents/gitRepos/master/utils/", k = 5, C = 5){
   #Sourcing the functions needed for bayesian multitask multiple kernel learning
   source(paste0(bmtmkl.dir, "bayesian_multitask_multiple_kernel_learning_train.R"))
   source(paste0(bmtmkl.dir, "bayesian_multitask_multiple_kernel_learning_test.R"))
   require(abind)
+  require(mlr)
   #####
   #Split up the task matrix (the target matrix) and the input data matrices
   drug.response <- object$Drug_Response_Training
   object <- object[-1]
-  ################################################################3
-  ###ORIGINAL VERSION
-  #For the data matrices, get the common cell lines and subset the data
-  cell.lines <- lapply(object, FUN = colnames)
-  common.cell.lines <- sort(Reduce(intersect, cell.lines))
-  common.cell.lines <- sort(intersect(rownames(drug.response), common.cell.lines))
   
-  drug.response <- drug.response[common.cell.lines,]
-  object <- lapply(object, FUN = function(data.view){data.view[,common.cell.lines]})
- 
-  
-  ##############################################################
-  #Normalization is already done, but we will need to construct the kernel matrices and set as arrays
-  
-  kernel2Mat <- function(kernel){
-    dim(kernel) <- c(sqrt(length(kernel)), sqrt(length(kernel)))
-    return(kernel)
-  }
-  
-  k <- 5
-  kernels <- lapply(object, FUN = function(data.view){getKernel(data.view, k)})
-  
-  kernels <- lapply(kernels, FUN = as.numeric)
-  kernels <- lapply(kernels, FUN = kernel2Mat)
-   ###TEMP VERSION##########################################################################
+  #Get the cell lines which are common to all experiments and for which we have drug response data
   cell.lines <- lapply(object, FUN = colnames)
   common.cell.lines <- sort(Reduce(intersect, cell.lines))
   object <- lapply(object, FUN = function(data.view){data.view[,common.cell.lines]})
   
-  kernel2Mat <- function(kernel){
-    dim(kernel) <- c(sqrt(length(kernel)), sqrt(length(kernel)))
-    return(kernel)
-  }
-  
-  k <- 5
+  #Make the kernels for each data view, these are the complete kernels with both training and test data
   kernels <- lapply(object, FUN = function(data.view){getKernel(data.view, k)})
-  kernels <- lapply(kernels, FUN = as.numeric)
-  kernels <- lapply(kernels, FUN = kernel2Mat)
+  kernels <- lapply(kernels, FUN = addNames, common.cell.lines)
   
+  #Make an array (3 dimensions) with all the kernels
+  kernel.array <- do.call(abind, c(kernels, list(along = 3)))
+  mkkm.model <- runMKKM(kernel.array, clusters = C)#Model contains the complete combined kernel with all common cell lines
+  combined.kernel <- mkkm.model$combined.kernel
   
-  #
+  #Get the cell lines which are common to all data views..and which are common to 
   training.lines <- sort(intersect(rownames(drug.response), common.cell.lines))
-  train.idx <- which(common.cell.lines %in% training.lines)
-  test.idx <- which(!common.cell.lines %in% training.lines)
-
-  
-  #subset the training data
-  training.kernels <- lapply(kernels, FUN = function(kernel){kernel[train.idx, train.idx]})
-  
-  
-  kernel.array <- do.call(abind, c(training.kernels, list(along = 3)))
-  
-  res <- runMKKM(kernel.array, 5)
-  
-  svm <- ksvm(x = as.kernelMatrix(res$combined.kernel), drug.response[training.lines,1])
-  
-  
-  #Make the combined kernel with all of the samples -- training and test
-  kernel.array <- do.call(abind, c(kernels, list(along = 3)))
-  combined.kernel.test <- combineKernels(kernels = kernel.array, kernel.params = res$state$theta)
-  
-  #index combined kernel matrix so that rows correspond to test cases and columns are the support vectors -- need to represent columns for
-  #the test indices first so that indexes of support vectors are correct
-  combined.kernel.test <- combined.kernel.test[-train.idx, train.idx]
-  combined.kernel.test <- combined.kernel.test[, SVindex(svm), drop = FALSE]
-  
-  preds <- predict(svm, combined.kernel.test, type = "response")
-  
-  #
-  
-  
-  ###TEMP VERSIOM##################################################################################
-  #kernel.array <- array(kernels, c(nrow(kernels[[1]]), ncol(kernels[[1]]), length(kernels)));
-  kernel.array <- do.call(abind, c(kernels, list(along = 3)))
-  
-  #just using the multiple kernel k means to perform regression with an svm model
-  
-  res <- runMKKM(kernel.array, 5)
-  
-  svm <- ksvm(x = as.kernelMatrix(res$combined.kernel), drug.response[training.lines,1])
-  
-  #######################Training for bayesian multitask multiple kernel learning###################################33
  
-  #initalize the parameters 
-  parameters <- list()
-  parameters$alpha_lambda <- 1
-  parameters$beta_lambda <- 1
+  #subset the training data
+  training.kernel.combined <-as.kernelMatrix(combined.kernel[training.lines,training.lines])
+  drug.response.training <- drug.response[training.lines,]
   
-  parameters$alpha_upsilon <- 1
-  parameters$beta_upsilon <- 1
-  
-  parameters$alpha_gamma <- 1e-10
-  parameters$beta_gamma <- 1e-10
-  
-  parameters$alpha_omega <- 1
-  parameters$beta_omega <- 1
-  
-  parameters$alpha_epsilon <- 1
-  parameters$beta_epsilon <- 1
-  
-  parameters$iteration <- 200
-  
-  parameters$progress <- 0
-  
-  parameters$seed <- 1606
-  
-  tasks <- ncol(drug.response)
-  #set the number of kernels (e.g., the number of views in Nature Biotechnology paper)
-  P <- length(object)
+  #empty object to store our svm models for each task
+  drug.response.training <- drug.response.training[,-c(5, 12, 13, 21, 24, 26)]
+  tasks <- colnames(drug.response.training)
+
+  task.models <- list()
+  task.preds <- list()
+  for(i in 1:length(tasks)){
+    print(task)
+    #response <- as.matrix(drug.response.training[,task, drop = FALSE])
+    response <- drug.response.training[,i]
+    names(response) <- training.lines
     
-  #initialize the kernels and outputs of each task for training
-  Ktrain <- vector("list", tasks)
-  ytrain <- vector("list", tasks)
-  for (task in 1:tasks) {
-    Ktrain[[task]] <- kernel.array #should be an Ntra x Ntra x P matrix containing similarity values between training samples of task t
-      ytrain[[task]] <- drug.response[, task] #should be an Ntra x 1 matrix containing target outputs of task t
+    svm <- ksvm(x = training.kernel.combined, y = response, kernel = 'matrix', cross = 5)
+    
+    #index combined kernel matrix so that rows correspond to test cases and columns are the support vectors -- need to represent columns for
+    #the test indices first so that indexes of support vectors are correct
+    combined.kernel.test <- combined.kernel[setdiff(rownames(combined.kernel), training.lines), training.lines]
+    combined.kernel.test <- combined.kernel.test[, SVindex(svm), drop = FALSE]
+    combined.kernel.test <- as.kernelMatrix(combined.kernel.test)
+    
+    preds <- predict(object = svm, newdata = combined.kernel.test)
+    
+    task.preds[i] <- list(preds)
+    task.models[i] <- svm
+    
   }
-  
-  #perform training
-  state <- bayesian_multitask_multiple_kernel_learning_train(Ktrain, ytrain, parameters)
-  
-  #display the kernel weights
-  print(state$be$mu[(tasks+1):(tasks+P)])
-  
-  kernel.weights <- state$be$mu[(tasks+1):(tasks+P)]/sum(state$be$mu[(tasks+1):(tasks+P)])
-  
-  #initialize the kernels of each task for testing
-  Ktest <- vector("list", tasks)
-  for (t in 1:tasks) {
-    Ktest[[t]] <- kernel.array#TEMP #should be an Ntra x Ntest x P matrix containing similarity values between training and test samples of task t
-  }
-  
-  #perform prediction
-  prediction <- bayesian_multitask_multiple_kernel_learning_test(Ktest, state)
-  
-  
+
+  names(task.preds) <- tasks
+  names(task.models) <- tasks
+
 }
 
+addNames <- function(kernel, common.cell.lines){
+  rownames(kernel) <- common.cell.lines
+  colnames(kernel) <- common.cell.lines
+  
+  return(kernel)
+}
 
+makeKernels <- function(object){
+ 
+   kernel2Mat <- function(kernel){
+    dim(kernel) <- c(sqrt(length(kernel)), sqrt(length(kernel)))
+    return(kernel)
+  }
+  
+  k <- 5
+  kernels <- lapply(object, FUN = function(data.view){getKernel(data.view, k)})
+  kernels <- lapply(kernels, FUN = as.numeric)
+  kernels <- lapply(kernels, FUN = kernel2Mat)
+  return(kernels)
+}
 
 getKernel <- function(data.view, k = 5){
   require(kernlab)
