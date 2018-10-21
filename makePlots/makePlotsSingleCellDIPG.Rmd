@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 
+source("~/Documents/uva/master/the/utils/singleCellPipeline.R")
+
 #Two different single glioma data sets from regev
 #GSE57872_GBM_data_matrix.txt is from the following paper: Single cell RNA-seq of primary human glioblastomas, GEO: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE57872
 #GSE102130_K27Mproject.RSEM.vh20170621.txt is from the following paper: Single cell RNA-seq analysis of K27M-mutant glioma, GEO: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE102130
@@ -84,4 +86,147 @@ dipg <- FindClusters(object = dipg, reduction.type = "pca", dims.use = 1:25,
 
 ```{r}
 dipg@meta.data$Batch <- unlist(lapply(dipg@cell.names, FUN = function(cell.name){unlist(strsplit(cell.name, split = "\\."))[1]}))
+```
+
+Looking at only the DIPG cells of interest
+
+```{r}
+#Remove the cells from all batches that are not diffue midline gliomas, in particular we are interested in keeping the cells from:
+#MUV1, MUV5, MUV10, BCH836, BCH869, BCH1126
+
+dipg.full <- dipg
+
+dipg.batches <- c("MUV1", "MUV5", "MUV10", "BCH836", "BCH869", "BCH1126")
+dipg.cells <- rownames(dipg@meta.data[dipg@meta.data$Batch %in% dipg.batches,])
+dipg <- SubsetData(object = dipg.full, cells.use = dipg.cells)
+
+```
+
+```{r}
+#Recaclulating, variable genes, TSNE, PCA, and clustering...provide alternative clustering using SIMLR
+
+dipg <- FindVariableGenes(object = dipg, mean.function = ExpMean, dispersion.function = LogVMR, 
+    x.low.cutoff = 0.0125, x.high.cutoff = 3, y.cutoff = 0.5)
+
+#Scale the data
+dipg <- ScaleData(object = dipg, vars.to.regress = c("nUMI"))
+
+
+
+dipg <- RunPCA(object = dipg, pc.genes = dipg@var.genes, pcs.compute = 100, do.print = FALSE)
+
+
+PCElbowPlot(object = dipg, num.pc = 100)
+
+##PCS to use == 25 for diffuse midline glioma data set????
+
+#TSNE Plot
+dipg <- RunTSNE(object = dipg, dims.use = 1:25, do.fast = TRUE)
+
+dipg <- FindClusters(object = dipg, reduction.type = "pca", dims.use = 1:25, 
+    resolution = 0.8, print.output = 0, save.SNN = TRUE)
+
+
+#Looking at some interesting Glial Cell Markers
+#oligodendrocytes and oligoprecursor Cells
+FeaturePlot(dipg, c("MAG", "MOG", "PDGFRA", "CSPG4", "OLIG1", "OLIG2"))
+
+#OligodendroCytic Differentiation
+FeaturePlot(dipg, c("MBP", "PLP1"))
+
+#Astrocytic Differentiation
+FeaturePlot(dipg, c("GFAP", "APOE"))
+
+#Cell cycle programs
+FeaturePlot(dipg, c("PCNA", "CDK1"))
+
+
+
+#Find some markers for these clusters in PCA space...using the SNN defined clusters
+dipg.snn.markers <- FindAllMarkers(dipg)
+
+```
+
+
+```{r}
+
+#pbmc <- RunCCA(object = dipg, object2 = seqwell, genes.use = hvg.union)
+#break out the individual patients into their own Seurat Object
+
+MUV1.cells <- rownames(dipg@meta.data[dipg@meta.data$Batch %in% "MUV1",])
+MUV5.cells <- rownames(dipg@meta.data[dipg@meta.data$Batch %in% "MUV5",])
+MUV10.cells <- rownames(dipg@meta.data[dipg@meta.data$Batch %in% "MUV10",])
+BCH836.cells <- rownames(dipg@meta.data[dipg@meta.data$Batch %in% "BCH836",])
+BCH869.cells <- rownames(dipg@meta.data[dipg@meta.data$Batch %in% "BCH869",])
+BCH1126.cells <- rownames(dipg@meta.data[dipg@meta.data$Batch %in% "BCH1126",])
+
+dipg.muv1 <- SubsetData(object = dipg, cells.use = MUV1.cells)
+dipg.muv5 <- SubsetData(object = dipg, cells.use = MUV5.cells)
+dipg.muv10 <- SubsetData(object = dipg, cells.use = MUV10.cells)
+dipg.bch836 <- SubsetData(object = dipg, cells.use = BCH836.cells)
+dipg.bch869 <- SubsetData(object = dipg, cells.use = BCH869.cells)
+dipg.bch1126 <- SubsetData(object = dipg, cells.use = BCH1126.cells)
+
+dipg.list <- list(dipg.muv1, dipg.muv5, dipg.muv10, dipg.bch836, dipg.bch869, dipg.bch1126)
+
+dipg.cca <- RunMultiCCA(object.list = dipg.list, genes.use = dipg@var.genes, num.ccs = 30)
+
+
+#Examining the discriminative signals provided by each canonical correlate
+#DimHeatmap(object = dipg.cca, reduction.type = "cca", cells.use = 500, dim.use = 10:18, 
+#    do.balanced = TRUE)
+
+#Aligning the CCA subspace
+dipg.cca <- AlignSubspace(object = dipg.cca, reduction.type = "cca", grouping.var = "Batch", dims.align = 1:30)
+
+#look at the TSNE and clustering using the anligned CCA subspace
+dipg.cca <- RunTSNE(object = dipg.cca, reduction.use = "cca.aligned", dims.use = 1:30, do.fast = TRUE)
+dipg.cca <- FindClusters(object = dipg.cca, reduction.type = "cca.aligned", dims.use = 1:30, save.SNN = TRUE)
+
+####I thought that the patient batches would come out overlapping, but they instead were still separated...can show that in this case even though subspaces were aligned,
+#the differences between tumors was so significant that there barely any overlapping populations ( + differences between oligodendrocytes?)
+TSNEPlot(object = dipg.cca, group.by = "Batch")
+TSNEPlot(object = dipg.cca)
+
+
+
+```
+
+```{r}
+#Run SIMLR on seurat object without CCA
+library(SIMLR)
+
+num.pcs <- 10
+simlr.result <- SIMLR(X = t(dipg@dr$pca@cell.embeddings[,1:num.pcs]), c = 6, k = 25, normalize = FALSE)
+
+tsne.simlr <- as.data.frame(simlr.result$ydata)
+tsne.simlr <- cbind(tsne.simlr, dipg@ident)
+tsne.simlr <- cbind(tsne.simlr, dipg@meta.data$Batch)
+colnames(x = tsne.simlr) <- c("SIMLR1", "SIMLR2", "Ident", "Batch")
+
+#Plot TSNE embedding based on SIMLR simlarities, color by SNN-cliq clusters
+plt <- ggplot(tsne.simlr, aes(x = SIMLR1, y = SIMLR2, color = factor(Ident))) + geom_point()
+plt + ggtitle("TSNE embedding based on SIMLR: SNN Clusters") + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "True Identity")
+#Plot TSNE embedding based on SIMLR simlarities, color by patient
+plt <- ggplot(tsne.simlr, aes(x = SIMLR1, y = SIMLR2, color = factor(Batch))) + geom_point()
+plt + ggtitle("TSNE embedding based on SIMLR: Patient of Origin") + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "True Identity")
+
+#Diffusion map on the SIMLR kernel
+library(destiny)
+dm.simlr <- DiffusionMap(data = simlr.result$ydata, k = 200)
+
+#####
+
+dipg <- RunDiffusion(dipg, genes.use = dipg@var.genes)
+DMPlot(dipg)
+
+cluster.ids <- dipg@ident
+
+dipg@ident <- as.factor(dipg@meta.data$res.0.6)
+
+DMPlot(dipg)
+
+#Saving the workspace image
+save.image(file = "~/Documents/uva/master/data/dipgSingleCellWorkspace.RData")
+
 ```
