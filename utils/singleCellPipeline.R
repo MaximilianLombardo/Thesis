@@ -47,3 +47,47 @@ calcNearestNeighbors <- function(data.matrix){
   dbscan.result <- dbscan(x = data.matrix, eps = 1, borderPoints = FALSE, minPts = 3)
   
 }
+
+
+SNFSNNgraph <- function(){
+  require(SNFtool)
+  
+  d1 <- dist2(dipg@dr$pca@cell.embeddings, dipg@dr$pca@cell.embeddings)
+  W1 <- affinityMatrix(d1)
+  
+  resolutions <- seq(0.1, 2.8, 0.3)
+  k.params <- seq(10, 100, 10)
+  num.pcs <- (1:25)
+  graphs <- lapply(num.pcs, FUN = function(pc){getSNNgraph(object, dims.use = 1:pc)})
+  
+  graph.1 <- as.matrix(BuildSNN(object = object, dims.use = 1:5)@snn)
+  graph.2 <- as.matrix(BuildSNN(object = object, dims.use = 6:10)@snn)
+  
+  idx <- sort(sample(1:2458,500))
+  
+  graphs <- list(graph.1[idx, idx], graph.2[idx, idx])
+  
+  normalize <- function(X) {
+    return(X/rowSums(X))
+  }
+  
+  avg.graph <- (graph.1 + graph.2)/2
+  W <- normalize(avg.graph)
+  W <- W + t(W)
+  W <- W * 1000
+  temp.res <- SNF(graphs, K = 50, t = 10)
+  
+  temp.graphs <- lapply(graphs, FUN = function(graph){graph[1:1000, 1:1000]})
+  
+}
+
+getSNNgraph <- function(object, k.param = 30, dims.use){
+  require(Seurat)
+  object <- BuildSNN(object, k.param = k.param, save.SNN = TRUE, force.recalc = TRUE, dims.use = dims.use)
+  snn.graph <- as.matrix(object@snn)
+  return(snn.graph)
+}
+
+
+
+

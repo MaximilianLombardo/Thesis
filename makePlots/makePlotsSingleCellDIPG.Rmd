@@ -208,17 +208,58 @@ colnames(x = tsne.simlr) <- c("SIMLR1", "SIMLR2", "Ident", "Batch")
 plt <- ggplot(tsne.simlr, aes(x = SIMLR1, y = SIMLR2, color = factor(Ident))) + geom_point()
 plt + ggtitle("TSNE embedding based on SIMLR: SNN Clusters") + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "True Identity")
 #Plot TSNE embedding based on SIMLR simlarities, color by patient
-plt <- ggplot(tsne.simlr, aes(x = SIMLR1, y = SIMLR2, color = factor(Batch))) + geom_point()
+plt <- ggplot(tsne.simlr, aes(x = SIMLR1, y = SIMLR2, color = factor(Batch))) + geom_point(shape = 16)
 plt + ggtitle("TSNE embedding based on SIMLR: Patient of Origin") + theme(plot.title = element_text(hjust = 0.5)) + labs(colour = "True Identity")
+
+
+plotSIMLRFeatures <- function(seurat.object, simlr.object, feature){
+  tsne.simlr <- as.data.frame(simlr.object$ydata)
+  tsne.simlr <- cbind(tsne.simlr, seurat.object@ident)
+  tsne.simlr <- cbind(tsne.simlr, seurat.object@meta.data$Batch)
+  tsne.simlr <- cbind(tsne.simlr, seurat.object@data[feature,])
+  colnames(x = tsne.simlr) <- c("SIMLR1", "SIMLR2", "Ident", "Batch", "Feature")
+
+#Plot TSNE embedding based on SIMLR simlarities, color by SNN-cliq clusters
+  ggplot(tsne.simlr, aes(x = SIMLR1, y = SIMLR2, color = Feature)) + geom_point(shape = 16) + scale_color_gradient(low="yellow", high="red")
+}
 
 #Diffusion map on the SIMLR kernel
 library(destiny)
 dm.simlr <- DiffusionMap(data = simlr.result$ydata, k = 200)
+dm.simlr <- DiffusionMap(data = simlr.result$S)
 
+
+
+
+
+dm.simlr.df <- as.data.frame(dm.simlr)
+dm.simlr.df <- cbind(dm.simlr.df, list(Batch = as.factor(dipg@meta.data$Batch), Ident = as.factor(dipg@ident)))
+
+
+ggplot(dm.simlr.df, aes(x = DC1, y = DC2, color = Ident)) + geom_point()
+
+ plot(dm.simlr, 1:3, col = rainbow(length(levels(dipg@meta.data$Batch)))[dipg@meta.data$Batch],)
+
+ 
+ 
+plotDMFeatures <- function(seurat.object, dm.object, feature){
+  dm.df <- as.data.frame(dm.object)
+  dm.df <- cbind(dm.df, list(Batch = as.factor(seurat.object@meta.data$Batch),
+                             Ident = as.factor(seurat.object@ident),
+                             Feature = seurat.object@data[feature,]))
+  
+  rbPal <- colorRampPalette(c('yellow','red'))
+  cols <- rbPal(20)[as.numeric(cut(seurat.object@data[feature,],breaks = 20))]
+  #ggplot(dm.df, aes(x = DC1, y = DC2, color = Feature)) + geom_point() + scale_color_gradient(low="yellow", high="red")
+  plot(dm.object, 1:2, col = cols, pch = 20)
+}
+
+ 
+ 
 #####
-
-dipg <- RunDiffusion(dipg, genes.use = dipg@var.genes)
-DMPlot(dipg)
+#Diffusion maps on the PCA matrix
+dipg.dm <- RunDiffusion(dipg)
+DMPlot(dipg.dm)
 
 cluster.ids <- dipg@ident
 
